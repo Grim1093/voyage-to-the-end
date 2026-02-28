@@ -1,10 +1,24 @@
 require('dotenv').config();
 const express = require('express');
 const { connectDB } = require('./config/db');
+const cors = require('cors');
 const logger = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// --- SECURITY MIDDLEWARE ---
+// Step 1: Configure CORS to strictly allow our Next.js frontend
+const corsOptions = {
+    origin: 'http://localhost:3001', // The exact URL of your React app
+    methods: ['GET', 'POST', 'PATCH'],
+    // We must explicitly allow our custom security header and JSON content
+    allowedHeaders: ['Content-Type', 'x-admin-key'], 
+};
+
+// Apply the CORS barrier
+app.use(cors(corsOptions));
+logger.info('ServerBoot', 'CORS middleware configured. Allowed origin: http://localhost:3001');
 
 // Middleware: This allows our server to read JSON data sent from the frontend forms
 app.use(express.json());
