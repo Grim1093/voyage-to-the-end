@@ -37,19 +37,50 @@ export const registerGuest = async (guestData) => {
     }
 };
 
+// --- NEW: SESSION VALIDATOR ---
+const getValidSessionKey = (context) => {
+    if (typeof window === 'undefined') return null;
+
+    const sessionString = sessionStorage.getItem('adminSession');
+    if (!sessionString) {
+        console.error(`${context} Failure Point O: Session data missing!`);
+        throw new Error('Unauthorized: Please log in.');
+    }
+
+    try {
+        const sessionData = JSON.parse(sessionString);
+        
+        // Failure Point W: Time-To-Live has expired
+        if (Date.now() > sessionData.expiresAt) {
+            console.warn(`${context} Failure Point W: Session TTL expired. Purging vault.`);
+            sessionStorage.removeItem('adminSession');
+            throw new Error('Session Expired: Your secure session has timed out.');
+        }
+
+        return sessionData.key;
+    } catch (error) {
+        // Catch parsing errors if someone tampers with the sessionStorage manually
+        if (error.message.includes('Session Expired')) throw error;
+        console.error(`${context} Failure Point X: Session data corrupted.`);
+        sessionStorage.removeItem('adminSession');
+        throw new Error('Unauthorized: Invalid session data.');
+    }
+};
+
 // --- ADMIN READ PIPELINE ---
 export const getAllGuests = async (page = 1, stateFilter = null) => {
     const context = '[Frontend API Service - getAllGuests]';
     console.log(`${context} Step 1: Initiating fetch for guest ledger. Page: ${page}, State: ${stateFilter}`);
 
     try {
-        const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY;
+        // NEW: Pull dynamically from the browser session
+        const adminKey = getValidSessionKey(context);
+        
         if (!adminKey) {
-            console.error(`${context} Failure Point O: NEXT_PUBLIC_ADMIN_KEY missing from frontend .env.local!`);
-            throw new Error('Admin key not configured on frontend.');
+            console.error(`${context} Failure Point O: Admin key missing from sessionStorage! User is unauthenticated.`);
+            throw new Error('Unauthorized: Please log in.');
         }
 
-        // Build the dynamic URL
         let url = `${API_URL}/guests?page=${page}`;
         if (stateFilter !== null && stateFilter !== '') {
             url += `&state=${stateFilter}`;
@@ -84,7 +115,8 @@ export const updateGuestState = async (guestId, newState, errorLog = null) => {
     console.log(`${context} Step 1: Initiating state transition for ${guestId} to State ${newState}`);
 
     try {
-        const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY;
+        // NEW: Pull dynamically from the browser session
+        const adminKey = typeof window !== 'undefined' ? sessionStorage.getItem('adminKey') : null;
         
         console.log(`${context} Step 2: Sending secure PATCH request to API...`);
         const response = await fetch(`${API_URL}/guests/${guestId}/state`, {

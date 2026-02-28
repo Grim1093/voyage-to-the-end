@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { getAllGuests, updateGuestState } from '../../services/api';
 
 export default function AdminDashboard() {
     const context = '[AdminDashboard Component]';
+    const router = useRouter();
 
     const [guests, setGuests] = useState([]);
     const [status, setStatus] = useState('loading'); // loading, success, error
@@ -12,8 +14,45 @@ export default function AdminDashboard() {
 
     // Fetch the ledger when the component mounts
     useEffect(() => {
-        fetchLedger();
-    }, []);
+        // Function to validate the session and redirect if failed
+        const validateGatekeeper = () => {
+            const sessionString = sessionStorage.getItem('adminSession');
+            if (!sessionString) {
+                console.warn(`${context} Failure Point V: No session found. Redirecting to vault.`);
+                router.push('/admin/login');
+                return false;
+            }
+
+            try {
+                const sessionData = JSON.parse(sessionString);
+                if (Date.now() > sessionData.expiresAt) {
+                    console.warn(`${context} Failure Point W: Active session expired. Enforcing logout.`);
+                    sessionStorage.removeItem('adminSession');
+                    router.push('/admin/login');
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                sessionStorage.removeItem('adminSession');
+                router.push('/admin/login');
+                return false;
+            }
+        };
+
+        // Run the check immediately on mount
+        if (validateGatekeeper()) {
+            fetchLedger();
+        }
+
+        // Set up an interval to passively check the TTL every 60 seconds
+        const passiveSecurityCheck = setInterval(() => {
+            validateGatekeeper();
+        }, 60000);
+
+        // Cleanup the interval when the component unmounts
+        return () => clearInterval(passiveSecurityCheck);
+
+    }, [router]);
 
     const fetchLedger = async () => {
         console.log(`${context} Step 1: Component mounted. Triggering ledger fetch.`);
@@ -27,6 +66,12 @@ export default function AdminDashboard() {
             console.error(`${context} Failure Point T: UI failed to load ledger.`, error.message);
             setStatus('error');
             setMessage(error.message);
+
+            // Optional: If the server kicks them out for a bad key, clear the session and redirect
+            if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
+                sessionStorage.removeItem('adminKey');
+                router.push('/admin/login');
+            }
         }
     };
 
