@@ -193,8 +193,9 @@ const guestLogin = async (req, res) => {
 
         logger.info(context, `Step 2: Querying ledger for email: ${email}`);
         
+        // --- NEW: EXPANDED PAYLOAD TO INCLUDE PHONE AND DIETARY RESTRICTIONS ---
         const query = `
-            SELECT id, full_name, current_state, id_document_url, access_code 
+            SELECT id, full_name, current_state, id_document_url, access_code, phone, dietary_restrictions 
             FROM guests 
             WHERE email = $1;
         `;
@@ -230,7 +231,6 @@ const guestLogin = async (req, res) => {
     }
 };
 
-// --- NEW LIVE STATE SYNC PIPELINE ---
 const getGuestStatus = async (req, res) => {
     const context = 'GuestController - Status Sync';
     const guestId = req.params.id;
@@ -268,5 +268,5 @@ module.exports = {
     getAllGuests,
     updateGuestState,
     guestLogin,
-    getGuestStatus // Export the new endpoint
+    getGuestStatus 
 };

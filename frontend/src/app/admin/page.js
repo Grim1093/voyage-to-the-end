@@ -9,12 +9,10 @@ export default function AdminDashboard() {
     const router = useRouter();
 
     const [guests, setGuests] = useState([]);
-    const [status, setStatus] = useState('loading'); // loading, success, error
+    const [status, setStatus] = useState('loading'); 
     const [message, setMessage] = useState('');
 
-    // Fetch the ledger when the component mounts
     useEffect(() => {
-        // Function to validate the session and redirect if failed
         const validateGatekeeper = () => {
             const sessionString = sessionStorage.getItem('adminSession');
             if (!sessionString) {
@@ -39,17 +37,14 @@ export default function AdminDashboard() {
             }
         };
 
-        // Run the check immediately on mount
         if (validateGatekeeper()) {
             fetchLedger();
         }
 
-        // Set up an interval to passively check the TTL every 60 seconds
         const passiveSecurityCheck = setInterval(() => {
             validateGatekeeper();
         }, 60000);
 
-        // Cleanup the interval when the component unmounts
         return () => clearInterval(passiveSecurityCheck);
 
     }, [router]);
@@ -58,7 +53,7 @@ export default function AdminDashboard() {
         console.log(`${context} Step 1: Component mounted. Triggering ledger fetch.`);
         setStatus('loading');
         try {
-            const result = await getAllGuests(1); // Fetching page 1, all states for MVP
+            const result = await getAllGuests(1); 
             setGuests(result.data);
             setStatus('success');
             console.log(`${context} Step 2: Ledger successfully rendered in UI.`);
@@ -67,88 +62,140 @@ export default function AdminDashboard() {
             setStatus('error');
             setMessage(error.message);
 
-            // Optional: If the server kicks them out for a bad key, clear the session and redirect
             if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
-                sessionStorage.removeItem('adminKey');
+                sessionStorage.removeItem('adminSession');
                 router.push('/admin/login');
             }
         }
     };
 
-    // Handler for the Verify/Reject buttons
     const handleStateChange = async (guestId, newState) => {
         console.log(`${context} Action: Admin clicked transition to State ${newState} for ${guestId}`);
         try {
             await updateGuestState(guestId, newState);
-            // Refresh the ledger to show the updated state
             fetchLedger(); 
         } catch (error) {
             alert(`Failed to update state: ${error.message}`);
         }
     };
 
-    // Helper to render beautiful state badges
+    const handleLockVault = () => {
+        console.log(`${context} Action: Admin manually locking the vault.`);
+        sessionStorage.removeItem('adminSession');
+        router.push('/admin/login');
+    };
+
     const renderStateBadge = (state) => {
         switch(state) {
-            case 0: return <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">0: Invited</span>;
-            case 1: return <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs">1: Submitted</span>;
-            case 2: return <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">2: Verified</span>;
-            case -1: return <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">-1: Error</span>;
-            default: return <span>Unknown</span>;
+            case 0: 
+                return <span className="px-2.5 py-1 bg-slate-800 text-slate-300 border border-slate-600 rounded-full text-xs font-medium tracking-wide shadow-sm">0: Invited</span>;
+            case 1: 
+                return <span className="px-2.5 py-1 bg-amber-900/40 text-amber-400 border border-amber-700/50 rounded-full text-xs font-medium tracking-wide shadow-sm shadow-amber-900/20">1: Submitted</span>;
+            case 2: 
+                return <span className="px-2.5 py-1 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 rounded-full text-xs font-medium tracking-wide shadow-sm shadow-emerald-900/20">2: Verified</span>;
+            case -1: 
+                return <span className="px-2.5 py-1 bg-rose-900/40 text-rose-400 border border-rose-700/50 rounded-full text-xs font-medium tracking-wide shadow-sm shadow-rose-900/20">-1: Action Req</span>;
+            default: 
+                return <span className="px-2.5 py-1 bg-slate-800 text-slate-500 rounded-full text-xs">Unknown</span>;
         }
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 p-8">
-            <div className="max-w-6xl mx-auto">
+        <main className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-black p-6 md:p-10 relative overflow-hidden">
+            
+            {/* Ambient Background Glow */}
+            <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-slate-800/20 rounded-full filter blur-[120px] pointer-events-none"></div>
+
+            <div className="max-w-7xl mx-auto z-10 relative">
                 
-                <header className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">MICE Ledger Explorer</h1>
-                    <p className="text-gray-500">Administrative Dashboard for Guest Verification</p>
+                <header className="mb-10 flex flex-col md:flex-row md:justify-between md:items-end gap-6 border-b border-slate-800 pb-6">
+                    <div>
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 shadow-inner">
+                                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+                            </div>
+                            <h1 className="text-3xl font-bold text-white tracking-tight">Ledger Explorer</h1>
+                        </div>
+                        <p className="text-slate-400 text-sm">Secure Command Center • Authorized Personnel Only</p>
+                    </div>
+                    
+                    <button 
+                        onClick={handleLockVault}
+                        className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-rose-900/80 hover:text-rose-200 hover:border-rose-700/50 text-slate-300 border border-slate-700 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-md"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
+                        Lock Vault
+                    </button>
                 </header>
 
                 {status === 'error' && (
-                    <div className="p-4 bg-red-50 text-red-700 rounded-md mb-6">{message}</div>
+                    <div className="p-4 bg-red-900/30 border-l-4 border-red-500 text-red-300 rounded-r-md mb-8 backdrop-blur-sm">
+                        {message}
+                    </div>
                 )}
 
                 {status === 'loading' ? (
-                    <div className="text-gray-500 text-center py-10">Syncing with backend ledger...</div>
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <svg className="animate-spin h-8 w-8 text-slate-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-slate-500 font-mono text-sm tracking-widest uppercase">Syncing Ledger...</span>
+                    </div>
                 ) : (
-                    <div className="bg-white shadow-sm rounded-lg overflow-hidden border border-gray-200">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-600 font-medium">
-                                <tr>
-                                    <th className="px-6 py-4">Guest Name</th>
-                                    <th className="px-6 py-4">Email</th>
-                                    <th className="px-6 py-4">Current State</th>
-                                    <th className="px-6 py-4">Registration Date</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 text-gray-800">
-                                {guests.length === 0 ? (
-                                    <tr><td colSpan="5" className="px-6 py-4 text-center text-gray-500">No guests found in ledger.</td></tr>
-                                ) : (
-                                    guests.map((guest) => (
-                                        <tr key={guest.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 font-medium">{guest.full_name}</td>
-                                            <td className="px-6 py-4">{guest.email}</td>
-                                            <td className="px-6 py-4">{renderStateBadge(guest.current_state)}</td>
-                                            <td className="px-6 py-4">{new Date(guest.created_at).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4 text-right space-x-2">
-                                                {/* Only show actions if they are in State 1 (Submitted) */}
-                                                {guest.current_state === 1 && (
-                                                    <>
-                                                        <button onClick={() => handleStateChange(guest.id, 2)} className="text-white bg-green-600 hover:bg-green-700 px-3 py-1 rounded transition">Verify</button>
-                                                        <button onClick={() => handleStateChange(guest.id, -1)} className="text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded transition">Reject</button>
-                                                    </>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="bg-slate-900/50 backdrop-blur-xl shadow-2xl rounded-xl overflow-hidden border border-slate-700/50">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-800 text-sm text-left">
+                                <thead className="bg-slate-800/80 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-5">Guest Identity</th>
+                                        <th className="px-6 py-5">Contact Node</th>
+                                        <th className="px-6 py-5">Ledger State</th>
+                                        <th className="px-6 py-5">Timestamp</th>
+                                        <th className="px-6 py-5 text-right">Execution</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                                    {guests.length === 0 ? (
+                                        <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500 font-mono">No records found in ledger.</td></tr>
+                                    ) : (
+                                        guests.map((guest) => (
+                                            <tr key={guest.id} className="hover:bg-slate-800/40 transition-colors duration-150">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-slate-200">{guest.full_name}</div>
+                                                    <div className="text-xs text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">{guest.id}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-400">{guest.email}</td>
+                                                <td className="px-6 py-4">{renderStateBadge(guest.current_state)}</td>
+                                                <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                                                    {new Date(guest.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {guest.current_state === 1 ? (
+                                                        <div className="flex justify-end gap-2">
+                                                            <button 
+                                                                onClick={() => handleStateChange(guest.id, 2)} 
+                                                                className="text-emerald-400 bg-emerald-900/20 hover:bg-emerald-600 hover:text-white border border-emerald-800/50 px-3 py-1.5 rounded text-xs font-semibold transition-all shadow-sm"
+                                                            >
+                                                                VERIFY
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleStateChange(guest.id, -1)} 
+                                                                className="text-rose-400 bg-rose-900/20 hover:bg-rose-600 hover:text-white border border-rose-800/50 px-3 py-1.5 rounded text-xs font-semibold transition-all shadow-sm"
+                                                            >
+                                                                REJECT
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-slate-600 text-xs font-mono uppercase tracking-wider">Locked</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
 
