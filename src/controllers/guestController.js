@@ -1,4 +1,6 @@
+const crypto = require('crypto'); // NEW: For secure code generation
 const db = require('../config/db');
+const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
 const registerGuest = async (req, res) => {
@@ -20,26 +22,41 @@ const registerGuest = async (req, res) => {
 
         logger.info(context, `Validation passed for ${email}. Attempting database insertion.`);
 
-        // Step 3: Parameterized SQL Query 
+        // Step 2.5: Generate Secure Access Code
+        // crypto.randomBytes(3) generates 3 bytes, which becomes 6 hex characters.
+        const accessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        logger.info(context, `Step 2.5: Generated secure access code for guest: ${email}`);
+
+        // Step 3: Parameterized SQL Query (Updated with access_code)
         const insertQuery = `
             INSERT INTO guests (
-                full_name, email, phone, id_number, id_document_url, dietary_restrictions, current_state
+                full_name, email, phone, id_number, id_document_url, dietary_restrictions, current_state, access_code
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7
-            ) RETURNING id, current_state;
+                $1, $2, $3, $4, $5, $6, $7, $8
+            ) RETURNING id, current_state, access_code;
         `;
-        const values = [fullName, email, phone, idNumber, idDocumentUrl, dietaryRestrictions, 1];
+        const values = [fullName, email, phone, idNumber, idDocumentUrl, dietaryRestrictions, 1, accessCode];
 
         const result = await db.query(insertQuery, values);
         const newGuest = result.rows[0];
 
         // Step 4: State Change Logging
         logger.stateChange(newGuest.id, 0, newGuest.current_state);
-        logger.info(context, `Successfully registered guest: ${newGuest.id}`);
+        logger.info(context, `Successfully registered guest: ${newGuest.id} with access code.`);
+
+        // Step 4.5: Trigger Email Service (Failure Point Y)
+        try {
+            logger.info(context, `Step 4.5: Handing off to Email Service to deliver code...`);
+            await emailService.sendAccessCode(email, fullName, accessCode); 
+            logger.info(context, `Email Service placeholder executed.`);
+        } catch (emailError) {
+            // We log the failure but DO NOT crash the registration. The guest is still in the database.
+            logger.warn(context, `Failure Point Y: Failed to send access code email to ${email}.`, emailError);
+        }
 
         res.status(201).json({
             success: true,
-            message: 'Guest successfully registered.',
+            message: 'Guest successfully registered. Access code generated.',
             guestId: newGuest.id
         });
 
@@ -99,11 +116,8 @@ const getAllGuests = async (req, res) => {
             logger.info(context, 'No state filter applied. Fetching all guests.');
         }
 
-        // Push pagination limits into the array AFTER the WHERE clause variables (if any)
         queryValues.push(limit, offset);
 
-        // Dynamically assign $ parameters. If we have a WHERE clause, limit/offset are $2 and $3.
-        // If we don't have a WHERE clause, limit/offset are $1 and $2.
         const limitParam = stateFilter !== undefined ? '$2' : '$1';
         const offsetParam = stateFilter !== undefined ? '$3' : '$2';
 
@@ -191,7 +205,6 @@ const updateGuestState = async (req, res) => {
         // Step 4: Execute Database Update (Failure Point G)
         logger.info(context, `Step 4: Executing PostgreSQL UPDATE to transition state from ${currentState} to ${newState}.`);
         
-        // We update the timestamp explicitly. If moving to an error state (-1), we append the errorLog.
         const updateQuery = `
             UPDATE guests 
             SET current_state = $1, error_log = $2, updated_at = CURRENT_TIMESTAMP
@@ -214,7 +227,6 @@ const updateGuestState = async (req, res) => {
         });
 
     } catch (error) {
-        // Step 6: Catch Database/UUID formatting errors (e.g., if guestId is not a valid UUID string)
         logger.error(context, `CRITICAL FAILURE at Step 6 during state update for guest ID: ${guestId}`, error);
         res.status(500).json({
             success: false,
@@ -225,6 +237,6 @@ const updateGuestState = async (req, res) => {
 
 module.exports = {
     registerGuest,
-    getAllGuests, // Exported the new function
+    getAllGuests,
     updateGuestState
 };
