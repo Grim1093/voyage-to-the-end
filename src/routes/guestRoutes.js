@@ -14,11 +14,29 @@ router.post('/register', (req, res) => {
 });
 
 /**
+ * Route: POST /api/guests/login
+ * Purpose: Authenticates a guest using their email and 6-character access code.
+ */
+router.post('/login', (req, res) => {
+    logger.info('GuestRoutes', 'Incoming POST request to /api/guests/login');
+    guestController.guestLogin(req, res);
+});
+
+/**
+ * Route: GET /api/guests/:id/status
+ * Purpose: Lightweight endpoint to fetch the live verification state (0, 1, 2, -1) for the guest dashboard.
+ */
+router.get('/:id/status', (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request to /api/guests/${req.params.id}/status`);
+    guestController.getGuestStatus(req, res);
+});
+
+/**
  * Route: GET /api/guests
  * Purpose: Retrieves a paginated list of guests.
  * Query Params: ?page=1 (defaults to 1)
  */
-router.get('/',requireAdminKey, (req, res) => {
+router.get('/', requireAdminKey, (req, res) => {
     logger.info('GuestRoutes', `Incoming GET request to /api/guests. Query params: ${JSON.stringify(req.query)}`);
     guestController.getAllGuests(req, res);
 });
@@ -28,8 +46,7 @@ router.get('/',requireAdminKey, (req, res) => {
  * Purpose: Updates the verification state (0, 1, 2, -1) of a specific guest.
  * Body: { "newState": 2, "errorLog": "Optional error reason if state is -1" }
  */
-
-router.patch('/:id/state',requireAdminKey, (req, res) => {
+router.patch('/:id/state', requireAdminKey, (req, res) => {
     logger.info('GuestRoutes', `Incoming PATCH request to /api/guests/${req.params.id}/state`);
     guestController.updateGuestState(req, res);
 });
