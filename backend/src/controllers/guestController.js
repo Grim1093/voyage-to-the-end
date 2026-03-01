@@ -70,53 +70,75 @@ const registerGuest = async (req, res) => {
 };
 
 const getAllGuests = async (req, res) => {
-    const context = 'GuestController';
+    const context = 'GuestController - getAllGuests';
     logger.info(context, `Received request to fetch guest ledger. Query params: ${JSON.stringify(req.query)}`);
 
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = 10;
+        // 1. Dynamic Pagination with Guardrails
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = parseInt(req.query.limit) || 10;
+        
+        // Safety Caps
+        if (limit > 100) {
+            logger.warn(context, `Failure Point P1: Requested limit (${limit}) exceeds maximum cap. Defaulting to 100.`);
+            limit = 100;
+        }
+        if (limit < 1) {
+            logger.warn(context, `Failure Point P2: Requested limit (${limit}) is invalid. Defaulting to 10.`);
+            limit = 10;
+        }
+
         const offset = (page - 1) * limit;
 
-        let stateFilter = req.query.state;
+        // 2. Dynamic Query Builder
         let queryValues = [];
         let countQueryValues = [];
-        let whereClause = '';
+        let whereConditions = [];
 
-        if (stateFilter !== undefined) {
-            stateFilter = parseInt(stateFilter);
+        // State Filter
+        if (req.query.state !== undefined && req.query.state !== '') {
+            const stateFilter = parseInt(req.query.state);
             const validStates = [0, 1, 2, -1];
             
             if (!validStates.includes(stateFilter)) {
-                logger.warn(context, `Validation failed (Failure Point K). Invalid state filter requested: ${stateFilter}`);
+                logger.warn(context, `Failure Point K: Invalid state filter requested: ${stateFilter}`);
                 return res.status(400).json({
                     success: false,
                     message: 'Invalid state filter. Must be 0, 1, 2, or -1.'
                 });
             }
             
-            logger.info(context, `Applying state filter: Only fetching guests in State ${stateFilter}`);
-            whereClause = 'WHERE current_state = $1';
+            // Dynamically assign the next $ variable (e.g., $1)
+            whereConditions.push(`current_state = $${queryValues.length + 1}`);
             queryValues.push(stateFilter);
             countQueryValues.push(stateFilter);
+            logger.info(context, `Applying state filter: State ${stateFilter}`);
         }
 
-        queryValues.push(limit, offset);
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-        const limitParam = stateFilter !== undefined ? '$2' : '$1';
-        const offsetParam = stateFilter !== undefined ? '$3' : '$2';
+        // Add Pagination Params to fetch query dynamically
+        queryValues.push(limit);
+        const limitParamIndex = queryValues.length;
+        
+        queryValues.push(offset);
+        const offsetParamIndex = queryValues.length;
 
         const fetchQuery = `
             SELECT id, full_name, email, current_state, created_at 
             FROM guests 
             ${whereClause}
             ORDER BY created_at DESC 
-            LIMIT ${limitParam} OFFSET ${offsetParam};
+            LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex};
         `;
         
+        const countQuery = `SELECT COUNT(*) FROM guests ${whereClause};`;
+
+        // 3. Execution
+        logger.info(context, `Executing fetch query with limit ${limit} and offset ${offset}.`);
         const result = await db.query(fetchQuery, queryValues);
         
-        const countQuery = `SELECT COUNT(*) FROM guests ${whereClause};`;
+        logger.info(context, `Executing count query to determine total pages.`);
         const countResult = await db.query(countQuery, countQueryValues);
         
         const totalGuests = parseInt(countResult.rows[0].count);
@@ -126,11 +148,16 @@ const getAllGuests = async (req, res) => {
             success: true,
             message: 'Guests retrieved successfully.',
             data: result.rows,
-            pagination: { currentPage: page, totalPages: totalPages, totalGuests: totalGuests }
+            pagination: { 
+                currentPage: page, 
+                limit: limit,
+                totalPages: totalPages, 
+                totalGuests: totalGuests 
+            }
         });
 
     } catch (error) {
-        logger.error(context, 'CRITICAL FAILURE during guest retrieval.', error);
+        logger.error(context, 'Failure Point P3: CRITICAL FAILURE during guest retrieval.', error);
         res.status(500).json({ success: false, message: 'Internal server error.' });
     }
 };

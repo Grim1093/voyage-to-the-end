@@ -63,9 +63,9 @@ const getValidSessionKey = (context) => {
 };
 
 // --- ADMIN READ PIPELINE ---
-export const getAllGuests = async (page = 1, stateFilter = null) => {
+export const getAllGuests = async (page = 1, limit = 10, stateFilter = null) => {
     const context = '[Frontend API Service - getAllGuests]';
-    console.log(`${context} Step 1: Initiating fetch for guest ledger. Page: ${page}, State: ${stateFilter}`);
+    console.log(`${context} Step 1: Initiating fetch for guest ledger. Page: ${page}, Limit: ${limit}, State: ${stateFilter}`);
 
     try {
         const adminKey = getValidSessionKey(context);
@@ -75,10 +75,17 @@ export const getAllGuests = async (page = 1, stateFilter = null) => {
             throw new Error('Unauthorized: Please log in.');
         }
 
-        let url = `${API_URL}/guests?page=${page}`;
+        // Using URLSearchParams for robust, scalable query string generation
+        const params = new URLSearchParams({
+            page: page,
+            limit: limit
+        });
+        
         if (stateFilter !== null && stateFilter !== '') {
-            url += `&state=${stateFilter}`;
+            params.append('state', stateFilter);
         }
+
+        const url = `${API_URL}/guests?${params.toString()}`;
 
         console.log(`${context} Step 2: Sending secure GET request to ${url}`);
         
@@ -94,7 +101,7 @@ export const getAllGuests = async (page = 1, stateFilter = null) => {
             throw new Error(data.message || 'Failed to fetch guests.');
         }
 
-        console.log(`${context} Step 3: Successfully retrieved ${data.data.length} guests from backend.`);
+        console.log(`${context} Step 3: Successfully retrieved ${data.data?.length || 0} guests from backend.`);
         return data;
 
     } catch (error) {

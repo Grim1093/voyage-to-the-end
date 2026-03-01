@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getAllGuests, updateGuestState } from '../../services/api';
 
@@ -11,6 +11,35 @@ export default function AdminDashboard() {
     const [guests, setGuests] = useState([]);
     const [status, setStatus] = useState('loading'); 
     const [message, setMessage] = useState('');
+    
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalGuests, setTotalGuests] = useState(0);
+    const [limit, setLimit] = useState(10);
+
+    const fetchLedger = useCallback(async (pageToFetch = currentPage, limitToFetch = limit) => {
+        console.log(`${context} Step 1: Triggering ledger fetch. Page: ${pageToFetch}, Limit: ${limitToFetch}`);
+        setStatus('loading');
+        try {
+            const result = await getAllGuests(pageToFetch, limitToFetch); 
+            setGuests(result.data);
+            setCurrentPage(result.pagination.currentPage);
+            setTotalPages(result.pagination.totalPages);
+            setTotalGuests(result.pagination.totalGuests);
+            setStatus('success');
+            console.log(`${context} Step 2: Ledger successfully rendered in UI.`);
+        } catch (error) {
+            console.error(`${context} Failure Point T: UI failed to load ledger.`, error.message);
+            setStatus('error');
+            setMessage(error.message);
+
+            if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
+                sessionStorage.removeItem('adminSession');
+                router.push('/admin/login');
+            }
+        }
+    }, [currentPage, limit, router]);
 
     useEffect(() => {
         const validateGatekeeper = () => {
@@ -38,7 +67,7 @@ export default function AdminDashboard() {
         };
 
         if (validateGatekeeper()) {
-            fetchLedger();
+            fetchLedger(1, 10); // Initial fetch
         }
 
         const passiveSecurityCheck = setInterval(() => {
@@ -46,34 +75,13 @@ export default function AdminDashboard() {
         }, 60000);
 
         return () => clearInterval(passiveSecurityCheck);
-
-    }, [router]);
-
-    const fetchLedger = async () => {
-        console.log(`${context} Step 1: Component mounted. Triggering ledger fetch.`);
-        setStatus('loading');
-        try {
-            const result = await getAllGuests(1); 
-            setGuests(result.data);
-            setStatus('success');
-            console.log(`${context} Step 2: Ledger successfully rendered in UI.`);
-        } catch (error) {
-            console.error(`${context} Failure Point T: UI failed to load ledger.`, error.message);
-            setStatus('error');
-            setMessage(error.message);
-
-            if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
-                sessionStorage.removeItem('adminSession');
-                router.push('/admin/login');
-            }
-        }
-    };
+    }, [fetchLedger, router]);
 
     const handleStateChange = async (guestId, newState) => {
         console.log(`${context} Action: Admin clicked transition to State ${newState} for ${guestId}`);
         try {
             await updateGuestState(guestId, newState);
-            fetchLedger(); 
+            fetchLedger(currentPage, limit); // Refresh current page
         } catch (error) {
             alert(`Failed to update state: ${error.message}`);
         }
@@ -83,6 +91,25 @@ export default function AdminDashboard() {
         console.log(`${context} Action: Admin manually locking the vault.`);
         sessionStorage.removeItem('adminSession');
         router.push('/admin/login');
+    };
+
+    // Pagination Handlers
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            fetchLedger(currentPage + 1, limit);
+        }
+    };
+
+    const handlePrevPage = () => {
+        if (currentPage > 1) {
+            fetchLedger(currentPage - 1, limit);
+        }
+    };
+
+    const handleLimitChange = (e) => {
+        const newLimit = parseInt(e.target.value);
+        setLimit(newLimit);
+        fetchLedger(1, newLimit); // Reset to page 1 when changing limit
     };
 
     const renderStateBadge = (state) => {
@@ -143,8 +170,8 @@ export default function AdminDashboard() {
                         <span className="text-slate-500 font-mono text-sm tracking-widest uppercase">Syncing Ledger...</span>
                     </div>
                 ) : (
-                    <div className="bg-slate-900/50 backdrop-blur-xl shadow-2xl rounded-xl overflow-hidden border border-slate-700/50">
-                        <div className="overflow-x-auto">
+                    <div className="bg-slate-900/50 backdrop-blur-xl shadow-2xl rounded-xl overflow-hidden border border-slate-700/50 flex flex-col">
+                        <div className="overflow-x-auto flex-grow">
                             <table className="min-w-full divide-y divide-slate-800 text-sm text-left">
                                 <thead className="bg-slate-800/80 text-slate-400 font-semibold text-xs uppercase tracking-wider">
                                     <tr>
@@ -196,9 +223,54 @@ export default function AdminDashboard() {
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* Pagination Footer */}
+                        {totalGuests > 0 && (
+                            <div className="bg-slate-800/50 border-t border-slate-700/50 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-sm text-slate-400">
+                                    Showing <span className="font-medium text-slate-200">{((currentPage - 1) * limit) + 1}</span> to <span className="font-medium text-slate-200">{Math.min(currentPage * limit, totalGuests)}</span> of <span className="font-medium text-slate-200">{totalGuests}</span> guests
+                                </div>
+                                
+                                <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                        <label htmlFor="limit-select" className="text-sm text-slate-400">Rows:</label>
+                                        <select 
+                                            id="limit-select"
+                                            value={limit} 
+                                            onChange={handleLimitChange}
+                                            className="bg-slate-900 border border-slate-700 text-slate-300 text-sm rounded focus:ring-slate-500 focus:border-slate-500 block p-1"
+                                        >
+                                            <option value={10}>10</option>
+                                            <option value={25}>25</option>
+                                            <option value={50}>50</option>
+                                            <option value={100}>100</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={handlePrevPage} 
+                                            disabled={currentPage === 1}
+                                            className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === 1 ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+                                        >
+                                            Prev
+                                        </button>
+                                        <div className="px-3 py-1 rounded bg-slate-900 border border-slate-700 text-slate-300 text-sm font-medium">
+                                            {currentPage} / {totalPages}
+                                        </div>
+                                        <button 
+                                            onClick={handleNextPage} 
+                                            disabled={currentPage === totalPages || totalPages === 0}
+                                            className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === totalPages || totalPages === 0 ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed' : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white'}`}
+                                        >
+                                            Next
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
-
             </div>
         </main>
     );
