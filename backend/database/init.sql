@@ -1,25 +1,49 @@
 -- Enable the UUID extension in PostgreSQL
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create the guests table with strict constraints
-CREATE TABLE IF NOT EXISTS guests (
+-- ARCHITECT NOTE: Clearing the old architecture
+-- CASCADE ensures any old dependencies are also cleanly wiped
+DROP TABLE IF EXISTS event_registrations CASCADE;
+DROP TABLE IF EXISTS guests CASCADE;
+
+-- ==========================================
+-- 1. THE GLOBAL IDENTITY VAULT
+-- ==========================================
+CREATE TABLE guests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     full_name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(50),
     
-    -- Logistics & Verification
-    id_number VARCHAR(100) NOT NULL,
-    id_document_url TEXT NOT NULL,
-    dietary_restrictions TEXT,
-    
-    -- State Machine & Logging (Crucial for our architecture)
-    current_state INTEGER DEFAULT 0, -- 0: Invited, 1: Submitted, 2: Verified, -1: Error
-    error_log TEXT,                  -- Will hold specific failure reasons if state drops to -1
-    
-    -- Audit Trails
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Note: To run this, you will execute this file against your Aiven PostgreSQL URL.
+-- ==========================================
+-- 2. THE EVENT JUNCTION (THE TICKET)
+-- ==========================================
+CREATE TABLE event_registrations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Relational Links
+    guest_id UUID REFERENCES guests(id) ON DELETE CASCADE,
+    event_id INT REFERENCES events(id) ON DELETE CASCADE,
+    
+    -- Security
+    access_code VARCHAR(255) NOT NULL,
+    
+    -- Event-Specific Logistics & Verification
+    id_number VARCHAR(100) NOT NULL,
+    id_document_url TEXT NOT NULL,
+    dietary_restrictions TEXT,
+    
+    -- State Machine & Logging
+    current_state INTEGER DEFAULT 0, 
+    error_log TEXT,                  
+    
+    -- Audit Trails
+    registered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- ARCHITECT NOTE: Prevent a guest from registering for the exact same event twice!
+    UNIQUE(guest_id, event_id)
+);

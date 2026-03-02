@@ -32,11 +32,14 @@ export default function GlobalPlatformHub() {
     }, []);
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-black flex flex-col items-center justify-center p-6 sm:p-10 text-white overflow-x-hidden relative">
+        // ARCHITECT NOTE: Removed overflow-x-hidden from main
+        <main className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-black flex flex-col items-center justify-center p-6 sm:p-10 text-white relative">
             
-            {/* Ambient Platform Glow Effects - Safely bleeding off-screen */}
-            <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full mix-blend-screen filter blur-[128px] animate-pulse pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/10 rounded-full mix-blend-screen filter blur-[128px] animate-pulse pointer-events-none" style={{ animationDelay: '2s' }}></div>
+            {/* ARCHITECT NOTE: Safely contained the glow effects to prevent double scrollbars */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full mix-blend-screen filter blur-[128px] animate-pulse"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/10 rounded-full mix-blend-screen filter blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            </div>
 
             <div className="max-w-6xl w-full z-10 flex flex-col items-center py-8">
                 
@@ -109,7 +112,6 @@ export default function GlobalPlatformHub() {
                             <p className="text-xs text-slate-500">Access the secure master ledger vault. Authorized personnel only.</p>
                         </div>
                     </div>
-                    {/* ARCHITECT NOTE: Pointing directly to the new Master Admin route */}
                     <Link 
                         href="/admin/login" 
                         className="py-2.5 px-5 bg-transparent hover:bg-slate-800 border border-slate-600 rounded-lg text-sm font-semibold text-slate-300 transition-colors whitespace-nowrap shadow-sm w-full sm:w-auto text-center"

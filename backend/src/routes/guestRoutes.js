@@ -5,6 +5,16 @@ const logger = require('../utils/logger');
 const { requireAdminKey } = require('../middleware/authMiddleware');
 
 /**
+ * Route: GET /api/guests/admin/all
+ * Purpose: Fetch ALL global identities and their aggregated events for the Master Admin Dashboard.
+ * ARCHITECT NOTE: Placed at the very top to prevent route collision with /:eventSlug!
+ */
+router.get('/admin/all', requireAdminKey, (req, res) => {
+    logger.info('GuestRoutes', 'Incoming GET request for Global Guest Directory.');
+    guestController.getGlobalGuests(req, res);
+});
+
+/**
  * Route: POST /api/guests/:eventSlug/register
  * Purpose: Receives the guest's form data for a specific event.
  */

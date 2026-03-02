@@ -3,7 +3,6 @@ const db = require('../config/db');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
-// Helper to map the URL slug to the database internal ID
 const getEventIdBySlug = async (slug, context) => {
     const result = await db.query('SELECT id FROM events WHERE slug = $1', [slug]);
     if (result.rowCount === 0) {
@@ -11,6 +10,63 @@ const getEventIdBySlug = async (slug, context) => {
         return null;
     }
     return result.rows[0].id;
+};
+
+// ARCHITECT NOTE: The New Global Guest Fetcher
+const getGlobalGuests = async (req, res) => {
+    const context = 'GuestController - getGlobalGuests';
+    logger.info(context, 'Master Admin fetching Global Guest Directory.');
+
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        let limit = parseInt(req.query.limit) || 10;
+        if (limit > 100) limit = 100;
+        
+        const offset = (page - 1) * limit;
+
+        // Uses JSON_AGG to bundle all a guest's events into an array
+        const fetchQuery = `
+            SELECT 
+                g.id, 
+                g.full_name, 
+                g.email, 
+                g.phone,
+                g.created_at,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'title', e.name,
+                            'slug', e.slug,
+                            'state', er.current_state
+                        )
+                    ) FILTER (WHERE e.id IS NOT NULL), '[]'
+                ) as registered_events
+            FROM guests g
+            LEFT JOIN event_registrations er ON g.id = er.guest_id
+            LEFT JOIN events e ON er.event_id = e.id
+            GROUP BY g.id
+            ORDER BY g.created_at DESC
+            LIMIT $1 OFFSET $2;
+        `;
+        
+        const countQuery = `SELECT COUNT(*) FROM guests;`;
+
+        const result = await db.query(fetchQuery, [limit, offset]);
+        const countResult = await db.query(countQuery);
+        
+        const totalGuests = parseInt(countResult.rows[0].count);
+        const totalPages = Math.ceil(totalGuests / limit);
+
+        res.status(200).json({
+            success: true,
+            data: result.rows,
+            pagination: { currentPage: page, limit, totalPages, totalGuests }
+        });
+
+    } catch (error) {
+        logger.error(context, 'Failure Point G10: CRITICAL FAILURE fetching global guests.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
 };
 
 const registerGuest = async (req, res) => {
@@ -34,35 +90,51 @@ const registerGuest = async (req, res) => {
             });
         }
 
-        // Multi-Tenant Isolation: Check if this email is already registered FOR THIS SPECIFIC EVENT
-        const checkDuplicateQuery = `SELECT id FROM guests WHERE email = $1 AND event_id = $2;`;
-        const duplicateCheck = await db.query(checkDuplicateQuery, [email, eventId]);
+        let guestId;
+        const findGuestQuery = `SELECT id FROM guests WHERE email = $1;`;
+        const guestResult = await db.query(findGuestQuery, [email]);
+
+        if (guestResult.rowCount > 0) {
+            guestId = guestResult.rows[0].id;
+            logger.info(context, `Step 1: Found existing global identity for ${email} (ID: ${guestId})`);
+        } else {
+            const insertGuestQuery = `
+                INSERT INTO guests (full_name, email, phone) 
+                VALUES ($1, $2, $3) RETURNING id;
+            `;
+            const newGuestResult = await db.query(insertGuestQuery, [fullName, email, phone]);
+            guestId = newGuestResult.rows[0].id;
+            logger.info(context, `Step 1: Created new global identity for ${email} (ID: ${guestId})`);
+        }
+
+        const checkDuplicateQuery = `SELECT id FROM event_registrations WHERE guest_id = $1 AND event_id = $2;`;
+        const duplicateCheck = await db.query(checkDuplicateQuery, [guestId, eventId]);
         
         if (duplicateCheck.rowCount > 0) {
-            logger.warn(context, `Failure Point E3: Registration failed. Email already exists in event ledger: ${email}`);
+            logger.warn(context, `Failure Point E3: Registration failed. Guest already has a ticket for this event: ${email}`);
             return res.status(409).json({
                 success: false,
-                message: 'A guest with this email is already registered for this event.'
+                message: 'You are already registered for this specific event.'
             });
         }
 
         const accessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-        logger.info(context, `Step 3: Generated secure access code for guest: ${email}`);
+        logger.info(context, `Step 2: Generated secure access code for registration: ${accessCode}`);
 
-        const insertQuery = `
-            INSERT INTO guests (
-                full_name, email, phone, id_number, id_document_url, dietary_restrictions, current_state, access_code, event_id
+        const insertRegQuery = `
+            INSERT INTO event_registrations (
+                guest_id, event_id, id_number, id_document_url, dietary_restrictions, current_state, access_code
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9
-            ) RETURNING id, current_state, access_code;
+                $1, $2, $3, $4, $5, $6, $7
+            ) RETURNING guest_id, current_state, access_code;
         `;
-        const values = [fullName, email, phone, idNumber, idDocumentUrl, dietaryRestrictions, 1, accessCode, eventId];
+        const regValues = [guestId, eventId, idNumber, idDocumentUrl, dietaryRestrictions, 1, accessCode];
 
-        const result = await db.query(insertQuery, values);
-        const newGuest = result.rows[0];
+        const result = await db.query(insertRegQuery, regValues);
+        const newRegistration = result.rows[0];
 
-        logger.stateChange(newGuest.id, 0, newGuest.current_state);
-        logger.info(context, `Successfully registered guest: ${newGuest.id} under event ID: ${eventId}`);
+        logger.stateChange(newRegistration.guest_id, 0, newRegistration.current_state);
+        logger.info(context, `Successfully registered guest: ${newRegistration.guest_id} for event ID: ${eventId}`);
 
         try {
             await emailService.sendAccessCode(email, fullName, accessCode); 
@@ -74,7 +146,7 @@ const registerGuest = async (req, res) => {
         res.status(201).json({
             success: true,
             message: 'Guest successfully registered.',
-            guestId: newGuest.id
+            guestId: newRegistration.guest_id
         });
 
     } catch (error) {
@@ -101,7 +173,7 @@ const getAllGuests = async (req, res) => {
 
         let queryValues = [eventId];
         let countQueryValues = [eventId];
-        let whereConditions = ['event_id = $1'];
+        let whereConditions = ['er.event_id = $1'];
 
         if (req.query.state !== undefined && req.query.state !== '') {
             const stateFilter = parseInt(req.query.state);
@@ -112,7 +184,7 @@ const getAllGuests = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Invalid state filter.' });
             }
             
-            whereConditions.push(`current_state = $${queryValues.length + 1}`);
+            whereConditions.push(`er.current_state = $${queryValues.length + 1}`);
             queryValues.push(stateFilter);
             countQueryValues.push(stateFilter);
         }
@@ -126,14 +198,20 @@ const getAllGuests = async (req, res) => {
         const offsetParamIndex = queryValues.length;
 
         const fetchQuery = `
-            SELECT id, full_name, email, current_state, created_at 
-            FROM guests 
+            SELECT g.id, g.full_name, g.email, er.current_state, er.registered_at as created_at 
+            FROM guests g
+            JOIN event_registrations er ON g.id = er.guest_id
             ${whereClause}
-            ORDER BY created_at DESC 
+            ORDER BY er.registered_at DESC 
             LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex};
         `;
         
-        const countQuery = `SELECT COUNT(*) FROM guests ${whereClause};`;
+        const countQuery = `
+            SELECT COUNT(*) 
+            FROM guests g
+            JOIN event_registrations er ON g.id = er.guest_id
+            ${whereClause};
+        `;
 
         const result = await db.query(fetchQuery, queryValues);
         const countResult = await db.query(countQuery, countQueryValues);
@@ -167,21 +245,21 @@ const updateGuestState = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid state value.' });
         }
 
-        const checkQuery = `SELECT current_state FROM guests WHERE id = $1 AND event_id = $2;`;
+        const checkQuery = `SELECT current_state FROM event_registrations WHERE guest_id = $1 AND event_id = $2;`;
         const checkResult = await db.query(checkQuery, [guestId, eventId]);
 
         if (checkResult.rowCount === 0) {
-            logger.warn(context, `Failure Point E5: IDOR Attempt or missing guest. Guest: ${guestId}, Event: ${eventId}`);
-            return res.status(404).json({ success: false, message: 'Guest not found in this event ledger.' });
+            logger.warn(context, `Failure Point E5: IDOR Attempt or missing ticket. Guest: ${guestId}, Event: ${eventId}`);
+            return res.status(404).json({ success: false, message: 'Guest is not registered for this event.' });
         }
 
         const currentState = checkResult.rows[0].current_state;
         
         const updateQuery = `
-            UPDATE guests 
-            SET current_state = $1, error_log = $2, updated_at = CURRENT_TIMESTAMP
-            WHERE id = $3 AND event_id = $4
-            RETURNING id, current_state;
+            UPDATE event_registrations 
+            SET current_state = $1, error_log = $2
+            WHERE guest_id = $3 AND event_id = $4
+            RETURNING guest_id as id, current_state;
         `;
         const logEntry = newState === -1 ? errorLog : null;
         const updateResult = await db.query(updateQuery, [newState, logEntry, guestId, eventId]);
@@ -210,9 +288,10 @@ const guestLogin = async (req, res) => {
         }
 
         const query = `
-            SELECT id, full_name, current_state, id_document_url, access_code, phone, dietary_restrictions 
-            FROM guests 
-            WHERE email = $1 AND event_id = $2;
+            SELECT g.id, g.full_name, er.current_state, er.id_document_url, er.access_code, g.phone, er.dietary_restrictions 
+            FROM guests g
+            JOIN event_registrations er ON g.id = er.guest_id
+            WHERE g.email = $1 AND er.event_id = $2;
         `;
         const result = await db.query(query, [email, eventId]);
 
@@ -239,11 +318,11 @@ const getGuestStatus = async (req, res) => {
         const eventId = await getEventIdBySlug(eventSlug, context);
         if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
 
-        const query = `SELECT current_state FROM guests WHERE id = $1 AND event_id = $2;`;
+        const query = `SELECT current_state FROM event_registrations WHERE guest_id = $1 AND event_id = $2;`;
         const result = await db.query(query, [guestId, eventId]);
 
         if (result.rowCount === 0) {
-            return res.status(404).json({ success: false, message: 'Guest not found.' });
+            return res.status(404).json({ success: false, message: 'Guest ticket not found.' });
         }
 
         res.status(200).json({ success: true, currentState: result.rows[0].current_state });
@@ -254,7 +333,6 @@ const getGuestStatus = async (req, res) => {
     }
 };
 
-// ARCHITECT NOTE: New Lazy-Loading Function for the Admin "Inspect" Vault
 const getGuestById = async (req, res) => {
     const context = 'GuestController - getGuestById';
     const guestId = req.params.id;
@@ -267,14 +345,15 @@ const getGuestById = async (req, res) => {
         if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
 
         const query = `
-            SELECT id, full_name, email, phone, id_number, id_document_url, dietary_restrictions, current_state, created_at 
-            FROM guests 
-            WHERE id = $1 AND event_id = $2;
+            SELECT g.id, g.full_name, g.email, g.phone, er.id_number, er.id_document_url, er.dietary_restrictions, er.current_state, er.registered_at as created_at 
+            FROM guests g
+            JOIN event_registrations er ON g.id = er.guest_id
+            WHERE g.id = $1 AND er.event_id = $2;
         `;
         const result = await db.query(query, [guestId, eventId]);
 
         if (result.rowCount === 0) {
-            logger.warn(context, `Failure Point G8: Guest not found for ID: ${guestId}`);
+            logger.warn(context, `Failure Point G8: Guest ticket not found for ID: ${guestId}`);
             return res.status(404).json({ success: false, message: 'Guest not found.' });
         }
 
@@ -290,6 +369,7 @@ const getGuestById = async (req, res) => {
 };
 
 module.exports = {
+    getGlobalGuests,
     registerGuest,
     getAllGuests,
     updateGuestState,

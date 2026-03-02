@@ -386,3 +386,32 @@ export const updateEventDetails = async (currentSlug, eventData) => {
         throw error;
     }
 };
+
+// ARCHITECT NOTE: Master Admin Global Guest Fetcher
+export const fetchGlobalGuests = async (page = 1, limit = 50) => {
+    const context = '[Frontend API Service - fetchGlobalGuests]';
+    console.log(`${context} Step 1: Fetching master global guest directory.`);
+
+    try {
+        const adminKey = getValidSessionKey(context);
+        if (!adminKey) throw new Error('Unauthorized: Please log in.');
+
+        const response = await fetch(`${API_URL}/guests/admin/all?page=${page}&limit=${limit}`, {
+            method: 'GET',
+            headers: { 'x-admin-key': adminKey }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point: Failed to fetch global guests.`, data.message);
+            throw new Error(data.message || 'Failed to fetch the global guest directory.');
+        }
+
+        return data; // Returns { success, data, pagination }
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error fetching global guests.`, error.message);
+        throw error;
+    }
+};
