@@ -13,11 +13,13 @@ export default function MasterDashboard() {
     const [events, setEvents] = useState([]);
     const [globalGuests, setGlobalGuests] = useState([]);
     const [status, setStatus] = useState('loading'); 
-    
-    // ARCHITECT NOTE: New State for the Global Guest Modal
     const [selectedGlobalGuest, setSelectedGlobalGuest] = useState(null);
 
+    const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
+
     useEffect(() => {
+        let inactivityTimer;
+
         const validateGatekeeper = () => {
             const sessionString = sessionStorage.getItem('adminSession');
             if (!sessionString) {
@@ -26,7 +28,7 @@ export default function MasterDashboard() {
             }
             try {
                 const sessionData = JSON.parse(sessionString);
-                if (Date.now() > sessionData.expiresAt) {
+                if (!sessionData.key) {
                     sessionStorage.removeItem('adminSession');
                     router.push('/admin/login');
                     return false;
@@ -39,150 +41,171 @@ export default function MasterDashboard() {
             }
         };
 
+        const handleLogout = () => {
+            console.log(`${context} Action: Session purged due to inactivity.`);
+            sessionStorage.removeItem('adminSession');
+            router.push('/admin/login');
+        };
+
+        const resetInactivityTimer = () => {
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                handleLogout();
+            }, INACTIVITY_LIMIT_MS);
+        };
+
         if (validateGatekeeper()) {
             if (activeTab === 'events') {
                 loadTenants();
             } else {
                 loadGlobalGuests();
             }
+
+            resetInactivityTimer();
+            const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+            activityEvents.forEach(event => window.addEventListener(event, resetInactivityTimer, { passive: true }));
+
+            return () => {
+                if (inactivityTimer) clearTimeout(inactivityTimer);
+                activityEvents.forEach(event => window.removeEventListener(event, resetInactivityTimer));
+            };
         }
     }, [router, activeTab]);
 
     const loadTenants = async () => {
         setStatus('loading');
-        console.log(`${context} Fetching deployed tenants from master ledger...`);
         try {
             const data = await fetchAllAdminEvents();
             setEvents(data);
             setStatus('success');
         } catch (error) {
-            console.error(`${context} Failed to load events.`, error);
             setStatus('error');
         }
     };
 
     const loadGlobalGuests = async () => {
         setStatus('loading');
-        console.log(`${context} Fetching global guest directory...`);
         try {
             const result = await fetchGlobalGuests(1, 50); 
             setGlobalGuests(result.data);
             setStatus('success');
         } catch (error) {
-            console.error(`${context} Failed to load global guests.`, error);
             setStatus('error');
         }
     };
 
     const handleLockVault = () => {
-        console.log(`${context} Action: Admin manually locking the vault.`);
         sessionStorage.removeItem('adminSession');
         router.push('/admin/login');
     };
 
-    // ARCHITECT NOTE: State Badge Renderer for the Modal
+    // ARCHITECT NOTE: Status indicators now use the "Dot + Text" blend style with no container
     const renderStateBadge = (state) => {
         switch(state) {
-            case 0: return <span className="px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-600 rounded text-[10px] font-bold tracking-wide uppercase">Invited</span>;
-            case 1: return <span className="px-2 py-0.5 bg-amber-900/40 text-amber-400 border border-amber-700/50 rounded text-[10px] font-bold tracking-wide uppercase">Submitted</span>;
-            case 2: return <span className="px-2 py-0.5 bg-emerald-900/40 text-emerald-400 border border-emerald-700/50 rounded text-[10px] font-bold tracking-wide uppercase">Verified</span>;
-            case -1: return <span className="px-2 py-0.5 bg-rose-900/40 text-rose-400 border border-rose-700/50 rounded text-[10px] font-bold tracking-wide uppercase">Action Req</span>;
-            default: return <span className="px-2 py-0.5 bg-slate-800 text-slate-500 rounded text-[10px] uppercase font-bold">Unknown</span>;
+            case 0: return <span className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-zinc-600"></span> Invited</span>;
+            case 1: return <span className="flex items-center gap-1.5 text-indigo-400/80 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-indigo-500 animate-pulse"></span> Review</span>;
+            case 2: return <span className="flex items-center gap-1.5 text-zinc-300 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]"></span> Verified</span>;
+            case -1: return <span className="flex items-center gap-1.5 text-rose-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-rose-500"></span> Action</span>;
+            default: return <span className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest">N/A</span>;
         }
     };
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-black p-6 md:p-10 relative overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
             
-            <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-blue-800/20 rounded-full filter blur-[120px] pointer-events-none"></div>
+            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
+                <div className="absolute top-[-30%] w-[1000px] h-[800px] bg-white/[0.02] rounded-full filter blur-[100px]"></div>
+                <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]"></div>
+            </div>
 
-            <div className="max-w-7xl mx-auto z-10 relative">
-                
-                <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-6">
+            <header className="w-full max-w-7xl flex items-center justify-between px-6 py-5 z-20">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-[11px] tracking-tighter">
+                        NX
+                    </div>
                     <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center border border-slate-700 shadow-inner">
-                                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                            </div>
-                            <h1 className="text-3xl font-bold text-white tracking-tight">Master Control Plane</h1>
-                        </div>
-                        <p className="text-slate-400 text-sm">Manage deployments, tenants, and global event ledgers.</p>
+                        <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Control Plane</h1>
+                        <p className="text-[9px] text-zinc-500 font-medium tracking-wide">Master Ledger Management</p>
                     </div>
-                    
-                    <div className="flex items-center gap-4 w-full md:w-auto">
-                        <Link 
-                            href={`/admin/events/new`}
-                            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-md shadow-blue-900/20"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                            Deploy New Tenant
-                        </Link>
+                </div>
 
-                        <button 
-                            onClick={handleLockVault}
-                            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-slate-800 hover:bg-rose-900/80 hover:text-rose-200 hover:border-rose-700/50 text-slate-300 border border-slate-700 px-5 py-2.5 rounded-lg font-medium transition-all duration-200 shadow-md"
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
-                            Lock Vault
-                        </button>
-                    </div>
-                </header>
+                <div className="flex items-center gap-3">
+                    <Link 
+                        href="/admin/events/new"
+                        className="hidden sm:flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-black bg-white hover:bg-zinc-200 px-4 py-2 rounded-full transition-all"
+                    >
+                        Deploy Tenant
+                    </Link>
+                    <button 
+                        onClick={handleLockVault}
+                        className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] px-4 py-2 rounded-full backdrop-blur-md"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
+                        Lock Vault
+                    </button>
+                </div>
+            </header>
 
-                <div className="flex space-x-6 mb-8 border-b border-slate-800">
+            <div className="max-w-7xl w-full z-10 flex flex-col px-6 pb-12">
+                
+                <div className="flex space-x-8 mb-10 mt-4 border-b border-white/[0.03]">
                     <button 
                         onClick={() => setActiveTab('events')} 
-                        className={`pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'events' ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'events' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         Active Tenants
+                        {activeTab === 'events' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
                     </button>
                     <button 
                         onClick={() => setActiveTab('guests')} 
-                        className={`pb-3 border-b-2 font-medium text-sm transition-colors ${activeTab === 'guests' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'guests' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
-                        Global Guest Directory
+                        Global Directory
+                        {activeTab === 'guests' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
                     </button>
                 </div>
 
                 {status === 'loading' ? (
-                    <div className="flex flex-col items-center justify-center py-20">
-                        <svg className="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <div className="flex flex-col items-center justify-center py-32">
+                        <svg className="animate-spin h-5 w-5 text-zinc-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span className="text-slate-500 font-mono text-sm tracking-widest uppercase">Syncing Ledger...</span>
                     </div>
                 ) : activeTab === 'events' ? (
-                    // --- TAB 1: EVENTS VIEW ---
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {events.length === 0 ? (
-                            <div className="col-span-full p-10 bg-slate-900/40 border border-slate-800/80 rounded-2xl text-slate-500 text-center italic">
-                                No active tenants found in the database. Deploy a new event to begin.
-                            </div>
+                            <div className="col-span-full py-20 text-center text-zinc-600 text-xs font-medium italic">No active nodes detected.</div>
                         ) : (
                             events.map((event) => (
-                                <div key={event.slug} className="bg-slate-900/50 backdrop-blur-xl border border-slate-700/50 rounded-xl p-6 flex flex-col shadow-lg transition-all hover:border-blue-500/50 hover:-translate-y-1">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="w-10 h-10 bg-blue-900/30 rounded-lg flex items-center justify-center border border-blue-800/50">
-                                            <span className="text-blue-400 font-bold text-sm uppercase">{event.slug.charAt(0)}</span>
+                                <div key={event.slug} className="bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="w-10 h-10 bg-white/[0.03] rounded-2xl flex items-center justify-center border border-white/[0.08] text-xs font-bold text-zinc-400">
+                                            {event.slug.charAt(0).toUpperCase()}
                                         </div>
-                                        {event.is_public ? (
-                                            <span className="px-2.5 py-1 bg-emerald-900/30 text-emerald-400 border border-emerald-800/50 rounded-full text-xs font-semibold">Public</span>
-                                        ) : (
-                                            <span className="px-2.5 py-1 bg-amber-900/30 text-amber-400 border border-amber-800/50 rounded-full text-xs font-semibold">Private</span>
-                                        )}
+                                        {/* ARCHITECT NOTE: Seamless blend for Public/Private indicators */}
+                                        <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
+                                            <span className={`w-1 h-1 rounded-full ${event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
+                                            {event.is_public ? 'Public' : 'Private'}
+                                        </span>
                                     </div>
-                                    <h3 className="text-xl font-bold text-white mb-1 truncate">{event.title}</h3>
+                                    <h3 className="text-lg font-medium text-white mb-1 truncate">{event.title}</h3>
                                     
-                                    <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 flex items-center gap-1 font-mono text-xs mb-6 truncate group w-fit">
+                                    <a 
+                                        href={`/${event.slug}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-zinc-500 text-[10px] font-mono mb-8 hover:text-indigo-400 transition-colors underline decoration-zinc-800 underline-offset-4 flex items-center gap-1.5"
+                                    >
                                         /{event.slug}
-                                        <svg className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                     </a>
                                     
                                     <div className="mt-auto flex gap-3">
-                                        <Link href={`/admin/${event.slug}`} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 py-2 rounded text-sm font-semibold transition-colors flex items-center justify-center border border-slate-700">
-                                            Manage Ledger
+                                        <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-200 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest text-center transition-all">
+                                            Manage Node
                                         </Link>
-                                        <Link href={`/admin/events/${event.slug}/edit`} className="w-10 flex items-center justify-center bg-slate-800/50 hover:bg-blue-600 text-slate-400 hover:text-white rounded transition-colors border border-slate-700/50" title="Edit Event Details">
+                                        <Link href={`/admin/events/${event.slug}/edit`} className="w-11 h-11 flex items-center justify-center bg-white/[0.03] hover:bg-indigo-500/20 border border-white/[0.05] text-zinc-400 hover:text-indigo-400 rounded-full transition-all">
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                         </Link>
                                     </div>
@@ -191,46 +214,41 @@ export default function MasterDashboard() {
                         )}
                     </div>
                 ) : (
-                    // --- TAB 2: GLOBAL GUESTS VIEW ---
-                    <div className="bg-slate-900/50 backdrop-blur-xl shadow-2xl rounded-xl overflow-hidden border border-slate-700/50 flex flex-col">
-                        <div className="overflow-x-auto flex-grow">
-                            <table className="min-w-full divide-y divide-slate-800 text-sm text-left">
-                                <thead className="bg-slate-800/80 text-slate-400 font-semibold text-xs uppercase tracking-wider">
-                                    <tr>
-                                        <th className="px-6 py-5">Global Identity</th>
-                                        <th className="px-6 py-5">Contact</th>
-                                        <th className="px-6 py-5">Network Entry Date</th>
-                                        <th className="px-6 py-5 text-right">Execution</th>
+                    <div className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-white/[0.03]">
+                                        <th className="px-8 py-5 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Global Identity</th>
+                                        <th className="px-8 py-5 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Communication</th>
+                                        <th className="px-8 py-5 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Entry Date</th>
+                                        <th className="px-8 py-5 text-right text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                                    {globalGuests.length === 0 ? (
-                                        <tr><td colSpan="4" className="px-6 py-8 text-center text-slate-500 font-mono">No guests found in the global network.</td></tr>
-                                    ) : (
-                                        globalGuests.map((guest) => (
-                                            <tr key={guest.id} className="hover:bg-slate-800/40 transition-colors duration-150">
-                                                <td className="px-6 py-4">
-                                                    <div className="font-medium text-slate-200">{guest.full_name}</div>
-                                                    <div className="text-xs text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">{guest.id}</div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-slate-300">{guest.email}</div>
-                                                    <div className="text-xs text-slate-500">{guest.phone || 'No phone'}</div>
-                                                </td>
-                                                <td className="px-6 py-4 font-mono text-xs text-slate-500">
-                                                    {new Date(guest.created_at).toLocaleDateString()}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <button 
-                                                        onClick={() => setSelectedGlobalGuest(guest)}
-                                                        className="text-emerald-400 bg-emerald-900/20 hover:bg-emerald-600 hover:text-white border border-emerald-800/50 px-4 py-2 rounded text-xs font-semibold transition-all shadow-sm"
-                                                    >
-                                                        VIEW PROFILE
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
+                                <tbody className="divide-y divide-white/[0.02]">
+                                    {globalGuests.map((guest) => (
+                                        <tr key={guest.id} className="group hover:bg-white/[0.02] transition-colors">
+                                            <td className="px-8 py-5">
+                                                <div className="text-sm font-medium text-zinc-200">{guest.full_name}</div>
+                                                <div className="text-[10px] text-zinc-600 font-mono mt-1">{guest.id}</div>
+                                            </td>
+                                            <td className="px-8 py-5">
+                                                <div className="text-xs text-zinc-400">{guest.email}</div>
+                                                <div className="text-[10px] text-zinc-600 mt-1">{guest.phone || 'No phone'}</div>
+                                            </td>
+                                            <td className="px-8 py-5 text-[10px] font-mono text-zinc-500">
+                                                {new Date(guest.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-8 py-5 text-right">
+                                                <button 
+                                                    onClick={() => setSelectedGlobalGuest(guest)}
+                                                    className="text-[10px] font-bold tracking-widest uppercase px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                                                >
+                                                    Vault Profile
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
@@ -238,81 +256,58 @@ export default function MasterDashboard() {
                 )}
             </div>
 
-            {/* ARCHITECT NOTE: The Global Guest Profile Vault Modal */}
             {selectedGlobalGuest && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
-                        
-                        <div className="p-6 border-b border-slate-800 flex justify-between items-start bg-slate-800/30">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-emerald-900/30 rounded-full flex items-center justify-center border border-emerald-800/50 text-emerald-400 font-bold text-lg">
-                                    {selectedGlobalGuest.full_name.charAt(0)}
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+                    <div className="bg-zinc-950 border border-white/[0.08] rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden">
+                        <div className="p-10">
+                            <div className="flex justify-between items-start mb-10">
+                                <div className="flex items-center gap-6">
+                                    <div className="w-16 h-16 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.1] text-white font-medium text-2xl">
+                                        {selectedGlobalGuest.full_name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h2 className="text-2xl font-medium text-white tracking-tight">{selectedGlobalGuest.full_name}</h2>
+                                        <p className="text-xs text-zinc-600 font-mono mt-1">UUID: {selectedGlobalGuest.id}</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-white mb-0.5">{selectedGlobalGuest.full_name}</h2>
-                                    <p className="text-slate-500 font-mono text-xs tracking-wider">ID: {selectedGlobalGuest.id}</p>
-                                </div>
+                                <button onClick={() => setSelectedGlobalGuest(null)} className="w-10 h-10 flex items-center justify-center bg-white/[0.03] rounded-full text-zinc-500 hover:text-white transition-colors border border-white/[0.05]">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
                             </div>
-                            <button onClick={() => setSelectedGlobalGuest(null)} className="text-slate-500 hover:text-white transition-colors p-1 bg-slate-800 rounded-lg hover:bg-slate-700">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
-                        </div>
 
-                        <div className="p-6 space-y-6">
-                            {/* Contact Info Block */}
-                            <div className="grid grid-cols-2 gap-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
-                                <div>
-                                    <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Email Address</span>
-                                    <span className="text-sm text-slate-300">{selectedGlobalGuest.email}</span>
+                            <div className="grid grid-cols-2 gap-8 mb-10 p-6 bg-white/[0.02] rounded-[32px] border border-white/[0.05]">
+                                <div className="space-y-1">
+                                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Network Email</span>
+                                    <p className="text-xs text-zinc-300">{selectedGlobalGuest.email}</p>
                                 </div>
-                                <div>
-                                    <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Phone Number</span>
-                                    <span className="text-sm text-slate-300">{selectedGlobalGuest.phone || 'Not Provided'}</span>
-                                </div>
-                                <div className="col-span-2 pt-2 border-t border-slate-800/50 mt-2">
-                                    <span className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">First Network Entry</span>
-                                    <span className="text-sm text-slate-400 font-mono">{new Date(selectedGlobalGuest.created_at).toLocaleString()}</span>
+                                <div className="space-y-1">
+                                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Contact Phone</span>
+                                    <p className="text-xs text-zinc-300">{selectedGlobalGuest.phone || 'Not Provided'}</p>
                                 </div>
                             </div>
 
-                            {/* Registered Events Block */}
-                            <div>
-                                <h3 className="text-sm font-bold text-slate-200 mb-3 border-b border-slate-800 pb-2 flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    Ticket Portfolio ({selectedGlobalGuest.registered_events?.length || 0})
-                                </h3>
-                                
-                                {selectedGlobalGuest.registered_events && selectedGlobalGuest.registered_events.length > 0 ? (
-                                    <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                                        {selectedGlobalGuest.registered_events.map((ticket, idx) => (
-                                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-800/40 border border-slate-700/50 rounded-lg hover:bg-slate-800/60 transition-colors">
-                                                <div>
-                                                    <div className="font-semibold text-sm text-white">{ticket.title}</div>
-                                                    <div className="text-xs text-slate-500 font-mono">/{ticket.slug}</div>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    {renderStateBadge(ticket.state)}
-                                                    <Link 
-                                                        href={`/admin/${ticket.slug}`}
-                                                        className="p-1.5 bg-slate-700 hover:bg-blue-600 text-slate-300 hover:text-white rounded transition-colors"
-                                                        title="Jump to Event Ledger"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                                    </Link>
-                                                </div>
+                            <div className="space-y-4">
+                                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Active Node Registrations</h3>
+                                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {selectedGlobalGuest.registered_events?.map((ticket, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-4 bg-white/[0.02] border border-white/[0.05] rounded-2xl">
+                                            <div>
+                                                <div className="text-xs font-semibold text-zinc-200">{ticket.title}</div>
+                                                <div className="text-[10px] text-zinc-600 font-mono">/{ticket.slug}</div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-sm text-slate-500 italic p-4 bg-slate-900/50 rounded-lg border border-slate-800 text-center">
-                                        This guest has no active event registrations.
-                                    </div>
-                                )}
+                                            <div className="flex items-center gap-4">
+                                                {renderStateBadge(ticket.state)}
+                                                <Link href={`/admin/${ticket.slug}`} className="text-zinc-500 hover:text-white transition-colors">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-
-                        <div className="p-4 bg-slate-800/50 border-t border-slate-800 flex justify-end">
-                            <button onClick={() => setSelectedGlobalGuest(null)} className="px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+                        <div className="px-10 py-6 bg-white/[0.02] border-t border-white/[0.05] flex justify-end">
+                            <button onClick={() => setSelectedGlobalGuest(null)} className="text-[10px] font-bold tracking-widest uppercase px-6 py-3 rounded-full bg-white text-black transition-all hover:bg-zinc-200">
                                 Close Vault
                             </button>
                         </div>

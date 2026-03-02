@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
 // ARCHITECT NOTE: Adjusted import path for the new deeper folder structure
 import { fetchGuestStatus } from '../../../../services/api'; 
 
@@ -31,18 +32,13 @@ export default function GuestDashboard() {
             const syncStatus = async () => {
                 try {
                     console.log(`${context} Step 3: Fetching live status from ledger for ID: ${parsedData.id}`);
-                    // ARCHITECT NOTE: Passing eventSlug to the sync API
                     const liveState = await fetchGuestStatus(eventSlug, parsedData.id);
                     
                     if (liveState !== parsedData.current_state) {
                         console.log(`${context} Step 4: State upgrade detected! Updating UI from ${parsedData.current_state} to ${liveState}`);
-                        
                         const updatedGuest = { ...parsedData, current_state: liveState };
                         setGuest(updatedGuest);
-                        
                         sessionStorage.setItem('guestData', JSON.stringify(updatedGuest));
-                    } else {
-                        console.log(`${context} Step 4: Cache is fully synced with ledger.`);
                     }
                 } catch (error) {
                     console.warn(`${context} Background sync failed. Falling back to cached state.`);
@@ -66,120 +62,138 @@ export default function GuestDashboard() {
 
     if (!guest) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center text-purple-600 font-medium">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-purple-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 text-zinc-500">
+                <svg className="animate-spin h-6 w-6 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Verifying secure session...
             </div>
         );
     }
 
-    const renderStateBanner = (state) => {
+    // ARCHITECT NOTE: Luma-styled status badges (Desaturated, pill-shaped, softly glowing)
+    const renderStatusBadge = (state) => {
         switch(state) {
             case 0: 
-                return <div className="bg-slate-100/80 backdrop-blur-sm text-slate-800 p-4 rounded-xl text-center font-semibold border border-slate-200 shadow-sm">Status: Invited - Please complete your profile.</div>;
+                return <span className="px-3 py-1 bg-zinc-800 text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-zinc-700">Invited</span>;
             case 1: 
-                return <div className="bg-amber-50/80 backdrop-blur-sm text-amber-800 p-4 rounded-xl text-center font-semibold border border-amber-200 shadow-sm">Status: Submitted - Awaiting Admin Verification.</div>;
+                return <span className="px-3 py-1 bg-amber-500/10 text-amber-500/80 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-500/20">Pending Review</span>;
             case 2: 
-                return <div className="bg-emerald-50/80 backdrop-blur-sm text-emerald-800 p-4 rounded-xl text-center font-bold border-2 border-emerald-500 shadow-md shadow-emerald-500/10">Status: VERIFIED - You are cleared for the event!</div>;
+                return <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 shadow-[0_0_12px_rgba(16,185,129,0.2)]">Verified Access</span>;
             case -1: 
-                return <div className="bg-rose-50/80 backdrop-blur-sm text-rose-800 p-4 rounded-xl text-center font-semibold border border-rose-200 shadow-sm">Status: Action Required - There was an issue with your verification.</div>;
+                return <span className="px-3 py-1 bg-rose-500/10 text-rose-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-500/20">Action Required</span>;
             default: 
-                return <div className="bg-slate-100/80 backdrop-blur-sm text-slate-800 p-4 rounded-xl text-center font-semibold">Status: Unknown</div>;
+                return <span className="px-3 py-1 bg-zinc-800 text-zinc-500 rounded-full text-[10px] font-bold uppercase tracking-wider border border-zinc-700">Unknown</span>;
         }
     };
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6 md:p-12 relative overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
             
-            <div className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] bg-purple-200/50 rounded-full filter blur-[120px] pointer-events-none -z-10"></div>
-            <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-200/50 rounded-full filter blur-[120px] pointer-events-none -z-10"></div>
+            {/* Highly desaturated, elegant ambient glows */}
+            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
+                <div className="absolute top-[-30%] w-[1000px] h-[800px] bg-white/[0.02] rounded-full filter blur-[100px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]" style={{ animationDelay: '2s' }}></div>
+            </div>
 
-            <div className="max-w-4xl mx-auto z-10 relative">
-                
-                <header className="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
-                    <div>
-                        <h1 className="text-3xl font-extrabold text-gray-900 mb-1 tracking-tight">Welcome, {guest.full_name}</h1>
-                        <p className="text-purple-600/80 font-medium">Your Personal Event Dashboard</p>
+            {/* Seamless Top Navigation Bar */}
+            <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20">
+                <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                        NX
                     </div>
-                    <button 
-                        onClick={handleLogout}
-                        className="bg-white/70 backdrop-blur-md border border-purple-100 text-purple-700 hover:bg-white hover:text-purple-900 hover:border-purple-200 px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm w-full md:w-auto"
-                    >
-                        Secure Logout
-                    </button>
-                </header>
+                    <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase hidden sm:block">Nexus</span>
+                </div>
+                
+                <button 
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] px-4 py-2.5 rounded-full backdrop-blur-md"
+                >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    Secure Logout
+                </button>
+            </header>
 
-                <div className="bg-white/70 backdrop-blur-xl shadow-lg rounded-2xl border border-white p-6 mb-6">
-                    <h2 className="text-lg font-bold text-gray-800 mb-4 tracking-wide">Verification Status</h2>
-                    {renderStateBanner(guest.current_state)}
+            <div className="max-w-4xl w-full z-10 flex flex-col items-center pb-12 pt-8 px-6">
+                
+                {/* Dashboard Intro */}
+                <div className="w-full text-left mb-12">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-3xl sm:text-4xl font-medium text-white tracking-tight mb-2">Welcome back, {guest.full_name.split(' ')[0]}</h1>
+                            <p className="text-sm text-zinc-500 font-normal tracking-wide">Accessing your secure event node and credentials.</p>
+                        </div>
+                        <div className="flex sm:justify-end">
+                            {renderStatusBadge(guest.current_state)}
+                        </div>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div className="bg-white/70 backdrop-blur-xl shadow-lg rounded-2xl border border-white p-6">
-                        <h2 className="text-lg font-bold text-gray-800 mb-5 tracking-wide flex items-center">
-                            <svg className="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                            Identity & Access
-                        </h2>
-                        <div className="space-y-4 text-sm">
-                            <div className="flex flex-col border-b border-purple-50/50 pb-3">
-                                <span className="text-gray-500 mb-1.5 font-medium">Secure Guest ID</span>
-                                <span className="font-mono text-indigo-900 break-all bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100/50">{guest.id}</span>
+                {/* Free-Floating Info Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-12">
+                    
+                    {/* Identity Credentials Card */}
+                    <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 group">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08]">
+                                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                             </div>
-                            <div className="flex flex-col pb-1">
-                                <span className="text-gray-500 mb-1.5 font-medium">ID Document</span>
-                                <a href={guest.id_document_url} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:text-purple-800 hover:underline font-semibold inline-flex items-center group">
-                                    View Submitted File 
-                                    <svg className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            <h2 className="text-sm font-semibold text-zinc-200 tracking-wide">Identity Node</h2>
+                        </div>
+                        <div className="space-y-6">
+                            <div>
+                                <span className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Secure ID</span>
+                                <span className="font-mono text-zinc-300 text-xs block bg-white/[0.03] p-3 rounded-2xl border border-white/[0.05] break-all">{guest.id}</span>
+                            </div>
+                            <div>
+                                <span className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Government ID</span>
+                                <a href={guest.id_document_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-2 transition-colors">
+                                    Verify Submission
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                 </a>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white/70 backdrop-blur-xl shadow-lg rounded-2xl border border-white p-6">
-                        <h2 className="text-lg font-bold text-gray-800 mb-5 tracking-wide flex items-center">
-                            <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                            Contact & Preferences
-                        </h2>
-                        <div className="space-y-4 text-sm">
-                            <div className="flex flex-col sm:flex-row sm:justify-between border-b border-purple-50/50 pb-4">
-                                <span className="text-gray-500 mb-1 sm:mb-0 font-medium">Phone Number</span>
-                                <span className="text-gray-900 font-semibold">{guest.phone || 'Not provided'}</span>
+                    {/* Profile Details Card */}
+                    <div className="bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 group">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08]">
+                                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                             </div>
-                            <div className="flex flex-col sm:flex-row sm:justify-between pb-1">
-                                <span className="text-gray-500 mb-1 sm:mb-0 font-medium">Dietary Restrictions</span>
-                                <span className="text-gray-900 font-semibold text-right max-w-[200px]">{guest.dietary_restrictions || 'None listed'}</span>
+                            <h2 className="text-sm font-semibold text-zinc-200 tracking-wide">Profile Attributes</h2>
+                        </div>
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center border-b border-white/[0.03] pb-4">
+                                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Network Contact</span>
+                                <span className="text-xs font-mono text-zinc-300">{guest.phone || 'N/A'}</span>
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Dietary Specs</span>
+                                <span className="text-xs text-zinc-300 font-medium leading-relaxed">{guest.dietary_restrictions || 'No restrictions committed to ledger.'}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Dynamic Event Itinerary Card */}
-                <div className="bg-white/70 backdrop-blur-xl shadow-xl rounded-2xl border border-white overflow-hidden">
-                    <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-5">
-                        <h2 className="text-lg font-bold text-white tracking-wide flex items-center">
-                            <svg className="w-5 h-5 mr-2 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            Event & Travel Itinerary
-                        </h2>
+                {/* Event Itinerary Container (The only structural element with slight prominence) */}
+                <div className="w-full bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[32px] overflow-hidden">
+                    <div className="px-8 py-5 border-b border-white/[0.03]">
+                        <h2 className="text-xs font-bold text-zinc-400 tracking-[0.2em] uppercase">Event Itinerary</h2>
                     </div>
-                    <div className="p-7">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
-                            <div>
-                                <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Event</span>
-                                {/* ARCHITECT NOTE: Dynamically injecting the event name based on the slug */}
-                                <span className="block text-gray-900 font-bold text-base capitalize">{eventSlug.replace(/-/g, ' ')}</span>
+                    <div className="p-8">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Selected Hub</span>
+                                <p className="text-sm text-zinc-100 font-medium capitalize">{eventSlug.replace(/-/g, ' ')}</p>
                             </div>
-                            <div>
-                                <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Status</span>
-                                <span className="block text-gray-900 font-semibold text-base">To Be Announced</span>
-                                <span className="block text-gray-500 text-xs mt-1.5 font-medium">Pending Admin Update</span>
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Schedule</span>
+                                <p className="text-sm text-zinc-400 font-normal italic">TBD by Node Admin</p>
                             </div>
-                            <div>
-                                <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Venue & Accommodation</span>
-                                <span className="block text-gray-900 font-semibold text-base">Location TBD</span>
-                                <span className="block text-gray-500 text-xs mt-1.5 font-medium">Check back later</span>
+                            <div className="space-y-1">
+                                <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Venue Protocol</span>
+                                <p className="text-sm text-zinc-400 font-normal italic">Pending Live Update</p>
                             </div>
                         </div>
                     </div>

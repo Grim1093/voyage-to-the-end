@@ -58,86 +58,86 @@ export default function GuestIntakeForm({ eventSlug }) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6 text-left p-2">
+        <form onSubmit={handleSubmit} className="space-y-8 text-left p-4 sm:p-8">
             
-            {/* Feedback Banners */}
+            {/* Minimalist Feedback Banners */}
             {status === 'error' && (
-                <div className="flex items-start p-4 bg-red-50/80 backdrop-blur-sm border-l-4 border-red-500 rounded-r-lg shadow-sm">
-                    <svg className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <p className="text-sm font-medium text-red-800">{message}</p>
+                <div className="flex items-start p-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl text-xs text-rose-400/80 shadow-sm tracking-wide">
+                    <svg className="w-4 h-4 text-rose-500/80 mr-3 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <p className="font-medium">{message}</p>
                 </div>
             )}
             
             {status === 'success' && (
-                <div className="flex flex-col p-5 bg-green-50/80 backdrop-blur-sm border border-green-200 rounded-xl shadow-sm text-center">
-                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-3">
-                        <svg className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                <div className="flex flex-col p-6 bg-emerald-500/5 border border-emerald-500/10 rounded-3xl shadow-[0_0_20px_rgba(16,185,129,0.05)] text-center">
+                    <div className="mx-auto flex items-center justify-center h-10 w-10 rounded-full bg-emerald-500/10 mb-3 border border-emerald-500/20">
+                        <svg className="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     </div>
-                    <p className="text-sm font-medium text-green-800 mb-1">{message}</p>
-                    <p className="text-xs text-green-600">Check your email for your 6-character access code.</p>
+                    <p className="text-sm font-semibold text-emerald-400 mb-1">{message}</p>
+                    <p className="text-[11px] text-emerald-500/60 tracking-wide font-medium">Check your email for your 6-character access code.</p>
                 </div>
             )}
 
-            {/* Input Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name *</label>
+            {/* Input Grid - Optimized for Luma minimalist aesthetic */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Full Name</label>
                     <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} 
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm hover:border-gray-300 text-gray-900" 
-                        placeholder="e.g. Satoshi Nakamoto" disabled={status === 'loading'} />
+                        className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-700 text-sm" 
+                        placeholder="Satoshi Nakamoto" disabled={status === 'loading'} />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address *</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Email Address</label>
                     <input type="email" name="email" value={formData.email} onChange={handleChange} 
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm hover:border-gray-300 text-gray-900" 
+                        className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-700 text-sm" 
                         placeholder="satoshi@network.com" disabled={status === 'loading'} />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Phone Number</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Phone Number</label>
                     <input type="text" name="phone" value={formData.phone} onChange={handleChange} 
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm hover:border-gray-300 text-gray-900" 
+                        className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-700 text-sm" 
                         placeholder="+1 234 567 8900" disabled={status === 'loading'} />
                 </div>
 
-                <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">ID Number *</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">ID Number</label>
                     <input type="text" name="idNumber" value={formData.idNumber} onChange={handleChange} 
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm hover:border-gray-300 text-gray-900 font-mono text-sm" 
+                        className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-700 font-mono text-sm tracking-wider" 
                         placeholder="Passport / Govt ID" disabled={status === 'loading'} />
                 </div>
 
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">ID Document URL *</label>
+                <div className="md:col-span-2 space-y-2">
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Identity Document URL</label>
                     <input type="text" name="idDocumentUrl" value={formData.idDocumentUrl} onChange={handleChange} 
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm hover:border-gray-300 text-gray-900" 
+                        className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-700 text-sm" 
                         placeholder="https://secure.storage.com/id-scan.jpg" disabled={status === 'loading'} />
                 </div>
 
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">Dietary Restrictions</label>
+                <div className="md:col-span-2 space-y-2">
+                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Dietary Restrictions</label>
                     <input type="text" name="dietaryRestrictions" value={formData.dietaryRestrictions} onChange={handleChange} 
-                        className="w-full px-4 py-3 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm hover:border-gray-300 text-gray-900" 
-                        placeholder="None" disabled={status === 'loading'} />
+                        className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-700 text-sm" 
+                        placeholder="e.g. Vegetarian, Gluten-free" disabled={status === 'loading'} />
                 </div>
             </div>
 
             <button type="submit" disabled={status === 'loading'} 
-                className="w-full mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-blue-500/30 transform transition-all duration-200 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center group">
+                className="w-full mt-10 bg-white text-black hover:bg-zinc-200 font-bold py-4 px-6 rounded-full shadow-[0_0_25px_rgba(255,255,255,0.1)] transform transition-all duration-300 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center group text-xs uppercase tracking-[0.2em]">
                 
                 {status === 'loading' ? (
                     <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Committing to Ledger...
+                        Encrypting...
                     </>
                 ) : (
                     <>
-                        Secure Registration
-                        <svg className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                        Complete Registration
+                        <svg className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                     </>
                 )}
             </button>

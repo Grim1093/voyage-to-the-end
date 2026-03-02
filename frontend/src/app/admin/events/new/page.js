@@ -25,27 +25,20 @@ export default function NewEventDeployment() {
 
     // Gatekeeper: Ensure only active Admins can view this deployment console
     useEffect(() => {
-        const sessionString = sessionStorage.getItem('adminSession');
-        if (!sessionString) {
-            console.warn(`${context} Failure Point V: Unauthorized deployment attempt.`);
-            router.push('/admin/login');
-            return;
-        }
-        try {
-            const sessionData = JSON.parse(sessionString);
-            if (Date.now() > sessionData.expiresAt) {
-                sessionStorage.removeItem('adminSession');
+        const validateGatekeeper = () => {
+            const sessionString = sessionStorage.getItem('adminSession');
+            if (!sessionString) {
+                console.warn(`${context} Failure Point V: Unauthorized deployment attempt.`);
                 router.push('/admin/login');
+                return;
             }
-        } catch (error) {
-            router.push('/admin/login');
-        }
+        };
+        validateGatekeeper();
     }, [router, context]);
 
     const handleNameChange = (e) => {
         const newName = e.target.value;
         
-        // Auto-generate slug if the user hasn't overridden it manually
         if (!slugManuallyEdited) {
             const autoSlug = newName
                 .toLowerCase()
@@ -60,7 +53,6 @@ export default function NewEventDeployment() {
 
     const handleSlugChange = (e) => {
         setSlugManuallyEdited(true);
-        // Force URL-safe formatting
         const safeSlug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
         setFormData({ ...formData, slug: safeSlug });
     };
@@ -98,24 +90,23 @@ export default function NewEventDeployment() {
 
     if (status === 'success') {
         return (
-            <main className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-black p-6 flex flex-col items-center justify-center relative overflow-hidden">
-                <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-emerald-800/20 rounded-full filter blur-[120px] pointer-events-none"></div>
+            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-6 text-zinc-200 relative">
+                <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-emerald-500/5 rounded-full filter blur-[120px] pointer-events-none"></div>
                 
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-10 max-w-lg text-center shadow-2xl z-10">
-                    <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
+                <div className="bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[40px] p-12 max-w-lg text-center shadow-2xl z-10">
+                    <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/20">
                         <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                     </div>
-                    <h1 className="text-3xl font-bold text-white mb-3">Tenant Deployed</h1>
-                    <p className="text-slate-400 mb-8 leading-relaxed">
-                        {message} The new environment is now live and isolated.
+                    <h1 className="text-3xl font-medium text-white mb-4 tracking-tight">Deployment Complete</h1>
+                    <p className="text-zinc-500 mb-10 leading-relaxed text-sm tracking-wide">
+                        {message} The new isolated environment is now routing live.
                     </p>
                     <div className="flex flex-col gap-4">
-                        <Link href={`/${formData.slug}`} className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-all shadow-md">
-                            Visit New Event Hub
+                        <Link href={`/${formData.slug}`} className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
+                            Visit Hub Node
                         </Link>
-                        {/* ARCHITECT NOTE: Route to global admin */}
-                        <Link href="/admin" className="w-full py-3 px-6 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-semibold transition-all">
-                            Return to Command Center
+                        <Link href="/admin" className="w-full py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-xs uppercase tracking-widest transition-all">
+                            Control Plane
                         </Link>
                     </div>
                 </div>
@@ -124,42 +115,40 @@ export default function NewEventDeployment() {
     }
 
     return (
-        <main className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-black p-6 md:p-10 relative overflow-hidden flex justify-center items-start pt-20">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
             
-            {/* Ambient Background Glow */}
-            <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-blue-800/10 rounded-full filter blur-[120px] pointer-events-none"></div>
+            {/* Ambient Background Depth */}
+            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
+                <div className="absolute top-[-30%] w-[1000px] h-[800px] bg-white/[0.02] rounded-full filter blur-[100px]"></div>
+                <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]"></div>
+            </div>
 
-            <div className="max-w-2xl w-full z-10 relative">
-                
-                <div className="mb-8">
-                    {/* ARCHITECT NOTE: Route to global admin */}
-                    <Link href="/admin" className="inline-flex items-center text-sm font-medium text-slate-400 hover:text-white transition-colors">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                        Back to Master Control Plane
+            {/* Seamless Top Navigation Bar */}
+            <header className="w-full max-w-7xl flex items-center justify-between px-6 py-5 z-20">
+                <div className="flex items-center gap-4">
+                    <Link href="/admin" className="w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.1] transition-all">
+                        <svg className="w-4 h-4 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                </div>
-
-                <div className="bg-slate-900/50 backdrop-blur-xl shadow-2xl rounded-2xl overflow-hidden border border-slate-700/50">
-                    <div className="p-8 border-b border-slate-800/60 flex items-center gap-4">
-                        <div className="w-12 h-12 bg-blue-900/30 rounded-lg flex items-center justify-center border border-blue-700/50">
-                            <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold text-white tracking-tight">Deploy New Tenant</h1>
-                            <p className="text-slate-400 text-sm">Provision a secure ledger and routing environment for a new event.</p>
-                        </div>
+                    <div>
+                        <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Node Deployment</h1>
+                        <p className="text-[9px] text-zinc-500 font-medium tracking-wide uppercase tracking-widest">Master Tenant Provisioning</p>
                     </div>
+                </div>
+            </header>
 
-                    <form onSubmit={handleSubmit} className="p-8 space-y-6">
+            <div className="max-w-2xl w-full z-10 relative px-6 pb-16 pt-8">
+                <div className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl">
+                    <form onSubmit={handleSubmit} className="p-10 space-y-10">
+                        
                         {status === 'error' && (
-                            <div className="p-4 bg-red-900/30 border-l-4 border-red-500 text-red-300 rounded-r-md backdrop-blur-sm text-sm">
+                            <div className="p-4 bg-rose-500/5 border border-rose-500/10 text-rose-400/80 text-xs font-medium rounded-2xl tracking-wide">
                                 {message}
                             </div>
                         )}
 
-                        <div className="space-y-5">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">Event Title *</label>
+                        <div className="space-y-8">
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Event Title</label>
                                 <input 
                                     type="text" 
                                     name="name"
@@ -167,15 +156,15 @@ export default function NewEventDeployment() {
                                     onChange={handleNameChange}
                                     placeholder="e.g., Global Tech Summit 2026"
                                     required
-                                    className="w-full bg-slate-950/50 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                 />
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">URL Slug *</label>
-                                <div className="flex bg-slate-950/50 border border-slate-700 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                                    <span className="flex items-center px-4 bg-slate-800 text-slate-400 text-sm border-r border-slate-700 hidden sm:flex">
-                                        platform.com/
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">URL Slug</label>
+                                <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all shadow-inner">
+                                    <span className="flex items-center pl-6 pr-2 text-zinc-600 text-[10px] font-mono uppercase tracking-tight">
+                                        node/
                                     </span>
                                     <input 
                                         type="text" 
@@ -184,52 +173,52 @@ export default function NewEventDeployment() {
                                         onChange={handleSlugChange}
                                         placeholder="global-tech-summit"
                                         required
-                                        className="w-full bg-transparent text-white px-4 py-3 focus:outline-none font-mono text-sm"
+                                        className="w-full bg-transparent text-white px-0 py-4 focus:outline-none font-mono text-sm"
                                     />
                                 </div>
-                                <p className="text-xs text-slate-500 mt-2 font-mono">This creates the dedicated portal: /{formData.slug || '...'}</p>
+                                <p className="text-[10px] text-zinc-600 ml-4 font-mono">Routing Path: /{formData.slug || '...'}</p>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">Event Date</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Event Date</label>
                                     <input 
                                         type="text" 
                                         name="eventDate"
                                         value={formData.eventDate}
                                         onChange={handleChange}
-                                        placeholder="e.g., Oct 15-18, 2026"
-                                        className="w-full bg-slate-950/50 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                        placeholder="Oct 15-18, 2026"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                     />
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">Location</label>
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Location</label>
                                     <input 
                                         type="text" 
                                         name="location"
                                         value={formData.location}
                                         onChange={handleChange}
-                                        placeholder="e.g., New Delhi, India"
-                                        className="w-full bg-slate-950/50 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                        placeholder="New Delhi, India"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                     />
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Description</label>
                                 <textarea 
                                     name="description"
                                     value={formData.description}
                                     onChange={handleChange}
-                                    placeholder="Briefly describe the event purpose..."
+                                    placeholder="Describe the node's purpose..."
                                     rows="3"
-                                    className="w-full bg-slate-950/50 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm resize-none placeholder-zinc-700 shadow-inner"
                                 />
                             </div>
 
-                            <div className="pt-2 border-t border-slate-800">
-                                <label className="flex items-center cursor-pointer group mt-4">
-                                    <div className="relative flex items-center">
+                            <div className="pt-6 border-t border-white/[0.03]">
+                                <label className="flex items-center cursor-pointer group">
+                                    <div className="relative">
                                         <input 
                                             type="checkbox" 
                                             name="isPublic"
@@ -237,38 +226,35 @@ export default function NewEventDeployment() {
                                             onChange={handleChange}
                                             className="sr-only" 
                                         />
-                                        <div className={`block w-12 h-6 rounded-full transition-colors ${formData.isPublic ? 'bg-blue-600' : 'bg-slate-700'}`}></div>
-                                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${formData.isPublic ? 'transform translate-x-6' : ''}`}></div>
+                                        <div className={`w-11 h-6 rounded-full transition-all duration-300 ${formData.isPublic ? 'bg-indigo-500/40' : 'bg-white/[0.05]'}`}></div>
+                                        <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${formData.isPublic ? 'translate-x-5' : ''}`}></div>
                                     </div>
                                     <div className="ml-4">
-                                        <span className="block text-sm font-medium text-slate-200">Public Visibility</span>
-                                        <span className="block text-xs text-slate-500">{formData.isPublic ? 'Event will appear on the Global Platform Hub.' : 'Event requires a direct link to access (Private).'}</span>
+                                        <span className="block text-xs font-semibold text-zinc-200 uppercase tracking-wider">Public Visibility</span>
+                                        <span className="block text-[10px] text-zinc-500 tracking-wide">{formData.isPublic ? 'Broadcasting on Global Hub' : 'Restricted to link access'}</span>
                                     </div>
                                 </label>
                             </div>
                         </div>
 
-                        <div className="pt-6 border-t border-slate-800 flex justify-end gap-4">
-                            {/* ARCHITECT NOTE: Route to global admin */}
+                        <div className="pt-8 border-t border-white/[0.03] flex justify-end gap-4 items-center">
                             <Link 
                                 href="/admin"
-                                className="px-6 py-3 rounded-lg font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition-all"
+                                className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] hover:text-white transition-colors"
                             >
-                                Cancel
+                                Discard Node
                             </Link>
                             <button 
                                 type="submit" 
                                 disabled={status === 'loading'}
-                                className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-all shadow-lg shadow-blue-900/30 disabled:opacity-50 flex items-center gap-2"
+                                className="px-8 py-4 bg-white hover:bg-zinc-200 text-black rounded-full font-bold text-[10px] uppercase tracking-[0.2em] transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-[0.98] disabled:opacity-50"
                             >
                                 {status === 'loading' ? (
-                                    <>
-                                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Deploying...
-                                    </>
-                                ) : (
-                                    'Deploy Tenant'
-                                )}
+                                    <span className="flex items-center gap-2">
+                                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        Provisioning...
+                                    </span>
+                                ) : 'Deploy Tenant'}
                             </button>
                         </div>
                     </form>

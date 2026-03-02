@@ -47,15 +47,13 @@ const getValidSessionKey = (context) => {
     try {
         const sessionData = JSON.parse(sessionString);
         
-        if (Date.now() > sessionData.expiresAt) {
-            console.warn(`${context} Failure Point W: Session TTL expired. Purging vault.`);
-            sessionStorage.removeItem('adminSession');
-            throw new Error('Session Expired: Your secure session has timed out.');
+        // ARCHITECT NOTE: Removed static TTL check. Inactivity is now dynamically handled by the UI layer.
+        if (!sessionData.key) {
+            throw new Error('Unauthorized: Invalid session payload.');
         }
 
         return sessionData.key;
     } catch (error) {
-        if (error.message.includes('Session Expired')) throw error;
         console.error(`${context} Failure Point X: Session data corrupted.`);
         sessionStorage.removeItem('adminSession');
         throw new Error('Unauthorized: Invalid session data.');

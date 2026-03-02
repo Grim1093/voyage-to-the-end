@@ -2,15 +2,24 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+// ARCHITECT NOTE: Importing dynamic from next/dynamic to prevent hydration mismatches
+import dynamic from 'next/dynamic';
 import { fetchPublicEvents } from '../services/api';
+
+// ARCHITECT NOTE: Dynamically importing the named EncryptedText component and disabling SSR
+const EncryptedText = dynamic(
+    () => import('@/components/ui/encrypted-text').then((mod) => mod.EncryptedText),
+    { ssr: false }
+);
 
 export default function GlobalPlatformHub() {
     const context = '[Global Platform Hub]';
 
-    // State Management for Dynamic Events
+    // State Management
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         console.log(`${context} Step 1: Global Platform Directory mounted. Fetching dynamic events...`);
@@ -22,7 +31,7 @@ export default function GlobalPlatformHub() {
                 setError(null);
             } catch (err) {
                 console.error(`${context} Failed to load events:`, err);
-                setError('Unable to connect to the global ledger. Please try again later.');
+                setError('Unable to connect to the global ledger. Please verify your network connection.');
             } finally {
                 setLoading(false);
             }
@@ -31,95 +40,135 @@ export default function GlobalPlatformHub() {
         loadEvents();
     }, []);
 
+    // Instantly filter events based on the search query
+    const filteredEvents = events.filter(event => 
+        event.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (event.desc && event.desc.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        event.slug.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
-        // ARCHITECT NOTE: Removed overflow-x-hidden from main
-        <main className="min-h-screen bg-gradient-to-br from-gray-950 via-slate-900 to-black flex flex-col items-center justify-center p-6 sm:p-10 text-white relative">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
             
-            {/* ARCHITECT NOTE: Safely contained the glow effects to prevent double scrollbars */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full mix-blend-screen filter blur-[128px] animate-pulse"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/10 rounded-full mix-blend-screen filter blur-[128px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+            {/* Highly desaturated, elegant ambient glows */}
+            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
+                <div className="absolute top-[-30%] w-[1000px] h-[800px] bg-white/[0.02] rounded-full filter blur-[100px]"></div>
+                <div className="absolute top-[-20%] w-[600px] h-[500px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]"></div>
             </div>
 
-            <div className="max-w-6xl w-full z-10 flex flex-col items-center py-8">
+            {/* Seamless Top Navigation Bar */}
+            <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20">
                 
-                {/* Platform Hero Section */}
-                <div className="text-center mb-14 space-y-4">
-                    <div className="inline-block mb-3 px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-xs font-bold tracking-widest uppercase shadow-sm">
-                        Nexus MICE Architecture
+                {/* Far Left: Brand Logo */}
+                <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                        NX
                     </div>
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-200 to-slate-500 drop-shadow-lg pb-2">
-                        Event Registration Platform
+                    <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase hidden sm:block">
+                        Nexus
+                    </span>
+                </div>
+
+                {/* Middle: Frosted Search Bar */}
+                <div className="flex-1 max-w-md mx-6 relative group">
+                    <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <input 
+                        type="text" 
+                        placeholder="Search active tenants..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] focus:border-indigo-500/30 focus:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm rounded-full py-2.5 pl-11 pr-4 outline-none transition-all duration-300 backdrop-blur-md shadow-inner"
+                    />
+                </div>
+
+                {/* Far Right: Admin Portal Pill */}
+                <Link 
+                    href="/admin/login" 
+                    className="flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] px-4 py-2.5 rounded-full backdrop-blur-md"
+                >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <span className="hidden sm:block">Vault Access</span>
+                </Link>
+            </header>
+
+            {/* Main Content Pane */}
+            <div className="max-w-5xl w-full z-10 flex flex-col items-center pb-8 pt-10 sm:pt-16 px-4 flex-grow">
+                
+                {/* Minimalist Hero Section */}
+                <div className="text-center mb-20 space-y-4">
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight leading-tight min-h-[1.2em]">
+                        {/* ARCHITECT NOTE: Safely rendered on the client side only */}
+                        <EncryptedText
+                            text="Global Event Ledger"
+                            encryptedClassName="text-zinc-600 font-mono tracking-normal"
+                            revealedClassName="text-white"
+                            revealDelayMs={50} 
+                        />
                     </h1>
-                    <p className="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto font-medium">
-                        Secure, multi-tenant ledger management for enterprise conferences, incentives, and global exhibitions.
+                    <p className="text-sm sm:text-base text-zinc-500 max-w-lg mx-auto font-normal leading-relaxed tracking-wide">
+                        Secure, multi-tenant state management for enterprise conferences, global exhibitions, and exclusive summits.
                     </p>
                 </div>
 
-                {/* Public Event Directory */}
-                <div className="w-full mb-12 min-h-[300px] flex flex-col">
-                    <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-3">
-                        <h2 className="text-xl font-bold text-slate-200 flex items-center gap-3">
-                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            Upcoming Public Events
+                {/* Free-Floating Public Event Directory */}
+                <div className="w-full mb-8 flex flex-col">
+                    
+                    {/* Unboxed Minimalist Header */}
+                    <div className="mb-6 px-2">
+                        <h2 className="text-xs font-semibold text-zinc-500 tracking-[0.2em] uppercase">
+                            Tenant Directory
                         </h2>
                     </div>
 
-                    {loading ? (
-                        <div className="flex-grow flex flex-col items-center justify-center">
-                            <svg className="animate-spin h-10 w-10 text-blue-500/50 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span className="text-slate-500 text-sm font-mono tracking-widest uppercase">Syncing Ledger...</span>
-                        </div>
-                    ) : error ? (
-                        <div className="flex-grow flex items-center justify-center p-6 bg-red-900/10 border border-red-900/50 rounded-2xl text-red-400 text-center">
-                            {error}
-                        </div>
-                    ) : events.length === 0 ? (
-                        <div className="flex-grow flex items-center justify-center p-6 bg-slate-900/40 border border-slate-800/80 rounded-2xl text-slate-500 text-center italic">
-                            No public events are currently scheduled.
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {events.map((event) => (
-                                <div key={event.slug} className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-2xl p-6 flex flex-col transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_10px_30px_-15px_rgba(59,130,246,0.3)]">
-                                    <div className="text-blue-400 text-xs font-bold uppercase tracking-wider mb-2">{event.date || 'TBA'}</div>
-                                    <h3 className="text-lg font-bold text-white mb-2">{event.title}</h3>
-                                    <p className="text-slate-400 text-sm mb-6 flex-grow leading-relaxed">{event.desc || 'No description provided.'}</p>
-                                    <Link 
-                                        href={`/${event.slug}`} 
-                                        className="w-full py-2.5 px-4 bg-slate-800 hover:bg-blue-600 border border-slate-700 hover:border-blue-500 rounded-lg font-semibold text-sm text-center transition-all flex justify-center items-center gap-2 group"
-                                    >
-                                        Enter Event Hub
-                                        <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                                    </Link>
+                    <div className="w-full flex-grow flex flex-col min-h-[300px]">
+                        {loading ? (
+                            <div className="flex-grow flex flex-col items-center justify-center">
+                                <svg className="animate-spin h-6 w-6 text-zinc-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        ) : error ? (
+                            <div className="flex-grow flex items-center justify-center">
+                                <div className="px-6 py-4 bg-rose-500/5 border border-rose-500/10 rounded-2xl text-rose-400/80 text-xs font-medium tracking-wide">
+                                    {error}
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Platform Administration Section */}
-                <div className="w-full max-w-2xl bg-slate-900/40 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-6 mx-auto">
-                    <div className="flex items-center gap-4 text-left">
-                        <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center flex-shrink-0 border border-slate-700 shadow-inner">
-                            <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
-                        </div>
-                        <div>
-                            <h3 className="text-base font-bold text-slate-200">Platform Administration</h3>
-                            <p className="text-xs text-slate-500">Access the secure master ledger vault. Authorized personnel only.</p>
-                        </div>
+                            </div>
+                        ) : events.length === 0 ? (
+                            <div className="flex-grow flex items-center justify-center">
+                                <div className="text-zinc-600 text-xs font-medium tracking-wide">
+                                    No public tenants are currently actively routing.
+                                </div>
+                            </div>
+                        ) : filteredEvents.length === 0 ? (
+                            <div className="flex-grow flex flex-col items-center justify-center space-y-2">
+                                <span className="text-zinc-500 text-sm">No results found for "{searchQuery}"</span>
+                                <button onClick={() => setSearchQuery('')} className="text-indigo-400 hover:text-indigo-300 text-xs tracking-wide transition-colors">Clear search</button>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {filteredEvents.map((event) => (
+                                    // Floating Luma-style Card
+                                    <div key={event.slug} className="bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-3xl p-6 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group">
+                                        <div className="text-zinc-500 text-[10px] font-medium tracking-[0.15em] mb-2">{event.date || 'TBA'}</div>
+                                        <h3 className="text-lg font-medium text-zinc-200 mb-2 leading-snug group-hover:text-white transition-colors">{event.title}</h3>
+                                        <p className="text-zinc-500 text-xs mb-6 flex-grow leading-relaxed line-clamp-2">{event.desc || 'No description provided.'}</p>
+                                        <Link 
+                                            href={`/${event.slug}`} 
+                                            className="w-full py-2.5 px-4 bg-white/[0.03] hover:bg-white/[0.1] border border-white/[0.05] rounded-full font-medium text-xs text-center transition-all duration-300 flex justify-center items-center text-zinc-300 hover:text-white"
+                                        >
+                                            Access Portal
+                                        </Link>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
-                    <Link 
-                        href="/admin/login" 
-                        className="py-2.5 px-5 bg-transparent hover:bg-slate-800 border border-slate-600 rounded-lg text-sm font-semibold text-slate-300 transition-colors whitespace-nowrap shadow-sm w-full sm:w-auto text-center"
-                    >
-                        System Override
-                    </Link>
                 </div>
-
             </div>
         </main>
     );
