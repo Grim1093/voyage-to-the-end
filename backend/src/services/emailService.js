@@ -11,32 +11,33 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const sendAccessCode = async (email, fullName, accessCode) => {
+// ARCHITECT NOTE: Added eventName parameter to distinguish multi-tenant event registrations
+const sendAccessCode = async (email, fullName, accessCode, eventName) => {
     const context = 'EmailService';
-    logger.info(context, `Step 1: Preparing to send access code to ${email}`);
+    logger.info(context, `Step 1: Preparing to send access code for event [${eventName}] to ${email}`);
 
     try {
-        // Step 2: Construct the email payload
+        // Step 2: Construct the email payload dynamically with the event name
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: email,
-            subject: 'Your MICE Event Access Code',
-            text: `Hello ${fullName},\n\nYour registration is confirmed. Your secure access code is: ${accessCode}\n\nPlease keep this code safe. You will need it to access your personalized event dashboard.\n\nBest,\nThe MICE Team`,
+            subject: `Your Access Code for ${eventName}`,
+            text: `Hello ${fullName},\n\nYour registration for ${eventName} is confirmed. Your secure access code is: ${accessCode}\n\nPlease keep this code safe. You will need it to access your personalized event dashboard.\n\nBest,\nThe ${eventName} Team`,
             html: `
                 <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2>Welcome to the MICE Event, ${fullName}!</h2>
-                    <p>Your registration is confirmed. To track your verification status and access your dashboard, use the secure code below:</p>
+                    <h2>Welcome to ${eventName}, ${fullName}!</h2>
+                    <p>Your registration is confirmed. To track your verification status and access your dashboard for <strong>${eventName}</strong>, use the secure code below:</p>
                     <div style="background-color: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
                         <h1 style="letter-spacing: 5px; color: #2563eb; margin: 0;">${accessCode}</h1>
                     </div>
                     <p>Keep this code safe. Do not share it with anyone.</p>
                     <br/>
-                    <p>Best regards,<br/><strong>The MICE Administration Team</strong></p>
+                    <p>Best regards,<br/><strong>The ${eventName} Administration Team</strong></p>
                 </div>
             `
         };
 
-        logger.info(context, `Step 2: Payload constructed. Attempting network dispatch...`);
+        logger.info(context, `Step 2: Payload constructed for ${email}. Attempting network dispatch...`);
 
         // Step 3: Send the email
         const info = await transporter.sendMail(mailOptions);

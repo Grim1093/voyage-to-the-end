@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link'; 
-import { loginGuest } from '../../../services/api'; 
+// ARCHITECT NOTE: Imported the new resendAccessCode function
+import { loginGuest, resendAccessCode } from '../../../services/api'; 
 
 export default function GuestPortalLogin() {
     const params = useParams();
@@ -13,7 +14,7 @@ export default function GuestPortalLogin() {
     const router = useRouter();
     
     const [formData, setFormData] = useState({ email: '', accessCode: '' });
-    const [status, setStatus] = useState('idle'); 
+    const [status, setStatus] = useState('idle'); // idle | loading | error | success
     const [message, setMessage] = useState('');
 
     const handleChange = (e) => {
@@ -36,20 +37,46 @@ export default function GuestPortalLogin() {
         try {
             console.log(`${context} Step 3: Hitting backend authentication endpoint for event: ${eventSlug}...`);
             
-            // ARCHITECT NOTE: Pass eventSlug to the API layer
             const result = await loginGuest(eventSlug, formData.email, formData.accessCode);
             
             console.log(`${context} Step 4: Authentication successful! Storing guest state.`);
             sessionStorage.setItem('guestData', JSON.stringify(result.data));
 
             console.log(`${context} Step 5: Redirecting to secure guest dashboard.`);
-            // ARCHITECT NOTE: Route to the dynamic dashboard
             router.push(`/${eventSlug}/portal/dashboard`);
 
         } catch (error) {
             console.error(`${context} CRITICAL FAILURE (Failure Point DD):`, error.message);
             setStatus('error');
             setMessage(error.message || 'Invalid email or access code. Please try again.');
+        }
+    };
+
+    // ARCHITECT NOTE: New handler for the code recovery mechanism
+    const handleResendCode = async () => {
+        console.log(`${context} Step 1: Guest code recovery triggered.`);
+        
+        if (!formData.email) {
+            console.warn(`${context} Failure Point R-UI: Email missing for recovery.`);
+            setStatus('error');
+            setMessage('Please enter your registered email address above to resend the code.');
+            return;
+        }
+
+        setStatus('loading');
+        setMessage('');
+
+        try {
+            console.log(`${context} Step 2: Hitting backend code recovery endpoint...`);
+            await resendAccessCode(eventSlug, formData.email);
+            
+            console.log(`${context} Step 3: Code recovery request successful.`);
+            setStatus('success');
+            setMessage('A new access code has been dispatched to your email.');
+        } catch (error) {
+            console.error(`${context} CRITICAL FAILURE (Failure Point R-UI-Fail):`, error.message);
+            setStatus('error');
+            setMessage(error.message || 'Failed to resend access code. Please verify your email or try again.');
         }
     };
 
@@ -81,9 +108,18 @@ export default function GuestPortalLogin() {
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">
+                        
+                        {/* Dynamic Status Badges: Error (Rose) and Success (Emerald) */}
                         {status === 'error' && (
-                            <div className="flex items-start p-3 bg-red-50/80 backdrop-blur-sm border-l-4 border-red-500 rounded-r-md text-sm text-red-800 shadow-sm">
-                                <svg className="w-5 h-5 text-red-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <div className="flex items-start p-3 bg-rose-50/80 backdrop-blur-sm border-l-4 border-rose-500 rounded-r-md text-sm text-rose-800 shadow-sm">
+                                <svg className="w-5 h-5 text-rose-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                {message}
+                            </div>
+                        )}
+
+                        {status === 'success' && (
+                            <div className="flex items-start p-3 bg-emerald-50/80 backdrop-blur-sm border-l-4 border-emerald-500 rounded-r-md text-sm text-emerald-800 shadow-sm transition-all">
+                                <svg className="w-5 h-5 text-emerald-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 {message}
                             </div>
                         )}
@@ -136,6 +172,22 @@ export default function GuestPortalLogin() {
                             )}
                         </button>
                     </form>
+
+                    {/* ARCHITECT NOTE: The New Code Recovery UI */}
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-slate-500 font-medium">
+                            Didn't receive your access code?{' '}
+                            <button
+                                type="button"
+                                onClick={handleResendCode}
+                                disabled={status === 'loading'}
+                                className="text-purple-600 font-bold hover:text-purple-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Resend it
+                            </button>
+                        </p>
+                    </div>
+
                 </div>
             </div>
         </main>

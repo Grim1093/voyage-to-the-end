@@ -27,6 +27,15 @@ router.post('/:eventSlug/register', (req, res) => {
 });
 
 /**
+ * Route: POST /api/guests/:eventSlug/resend-code
+ * Purpose: Recovery mechanism to re-trigger the access code email for registered guests.
+ */
+router.post('/:eventSlug/resend-code', (req, res) => {
+    logger.info('GuestRoutes', `Incoming POST request to resend code for event: ${req.params.eventSlug}`);
+    guestController.resendAccessCode(req, res);
+});
+
+/**
  * Route: POST /api/guests/:eventSlug/login
  * Purpose: Authenticates a guest for a specific event using their email and 6-character access code.
  */

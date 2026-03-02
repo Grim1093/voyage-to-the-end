@@ -3,13 +3,17 @@ const db = require('../config/db');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 
-const getEventIdBySlug = async (slug, context) => {
-    const result = await db.query('SELECT id FROM events WHERE slug = $1', [slug]);
+// ARCHITECT NOTE: Upgraded helper to return both ID and Name to support dynamic multi-tenant emails.
+const getEventBySlug = async (slug, context) => {
+    const result = await db.query('SELECT id, name FROM events WHERE slug = $1', [slug]);
     if (result.rowCount === 0) {
         logger.warn(context, `Failure Point E1: Event slug not found in database: ${slug}`);
         return null;
     }
-    return result.rows[0].id;
+    return {
+        id: result.rows[0].id,
+        name: result.rows[0].name
+    };
 };
 
 // ARCHITECT NOTE: The New Global Guest Fetcher
@@ -75,10 +79,13 @@ const registerGuest = async (req, res) => {
     logger.info(context, `Received new registration request for event: ${eventSlug}`);
 
     try {
-        const eventId = await getEventIdBySlug(eventSlug, context);
-        if (!eventId) {
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) {
             return res.status(404).json({ success: false, message: 'Event not found.' });
         }
+        
+        const eventId = event.id;
+        const eventName = event.name;
 
         const { fullName, email, phone, idNumber, idDocumentUrl, dietaryRestrictions } = req.body;
 
@@ -136,12 +143,15 @@ const registerGuest = async (req, res) => {
         logger.stateChange(newRegistration.guest_id, 0, newRegistration.current_state);
         logger.info(context, `Successfully registered guest: ${newRegistration.guest_id} for event ID: ${eventId}`);
 
-        try {
-            await emailService.sendAccessCode(email, fullName, accessCode); 
-            logger.info(context, `Email Service executed.`);
-        } catch (emailError) {
-            logger.warn(context, `Failure Point Y: Failed to send access code email to ${email}.`, emailError);
-        }
+        // ARCHITECT NOTE: Fire-and-forget email delivery. 
+        // We now successfully pass the eventName down to the email service.
+        emailService.sendAccessCode(email, fullName, accessCode, eventName)
+            .then(() => {
+                logger.info(context, `Background email delivery successful for: ${email}`);
+            })
+            .catch((emailError) => {
+                logger.error(context, `Failure Point E4-B: Background Email Delivery Failed to ${email}.`, emailError);
+            });
 
         res.status(201).json({
             success: true,
@@ -160,8 +170,10 @@ const getAllGuests = async (req, res) => {
     const eventSlug = req.params.eventSlug;
 
     try {
-        const eventId = await getEventIdBySlug(eventSlug, context);
-        if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+        
+        const eventId = event.id;
 
         const page = Math.max(1, parseInt(req.query.page) || 1);
         let limit = parseInt(req.query.limit) || 10;
@@ -237,8 +249,10 @@ const updateGuestState = async (req, res) => {
     const eventSlug = req.params.eventSlug;
     
     try {
-        const eventId = await getEventIdBySlug(eventSlug, context);
-        if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+        
+        const eventId = event.id;
 
         const { newState, errorLog } = req.body;
         if (![0, 1, 2, -1].includes(newState)) {
@@ -279,8 +293,10 @@ const guestLogin = async (req, res) => {
     const eventSlug = req.params.eventSlug;
 
     try {
-        const eventId = await getEventIdBySlug(eventSlug, context);
-        if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+        
+        const eventId = event.id;
 
         const { email, accessCode } = req.body;
         if (!email || !accessCode) {
@@ -315,8 +331,10 @@ const getGuestStatus = async (req, res) => {
     const eventSlug = req.params.eventSlug;
 
     try {
-        const eventId = await getEventIdBySlug(eventSlug, context);
-        if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+        
+        const eventId = event.id;
 
         const query = `SELECT current_state FROM event_registrations WHERE guest_id = $1 AND event_id = $2;`;
         const result = await db.query(query, [guestId, eventId]);
@@ -341,8 +359,10 @@ const getGuestById = async (req, res) => {
     logger.info(context, `Fetching extended details for guest ID: ${guestId}`);
 
     try {
-        const eventId = await getEventIdBySlug(eventSlug, context);
-        if (!eventId) return res.status(404).json({ success: false, message: 'Event not found.' });
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+        
+        const eventId = event.id;
 
         const query = `
             SELECT g.id, g.full_name, g.email, g.phone, er.id_number, er.id_document_url, er.dietary_restrictions, er.current_state, er.registered_at as created_at 
@@ -368,6 +388,59 @@ const getGuestById = async (req, res) => {
     }
 };
 
+// ARCHITECT NOTE: Recovery Mechanism to resend access codes without re-registering
+const resendAccessCode = async (req, res) => {
+    const context = 'GuestController - ResendCode';
+    const eventSlug = req.params.eventSlug;
+    const { email } = req.body;
+
+    logger.info(context, `Received resend access code request for ${email} at event: ${eventSlug}`);
+
+    try {
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+
+        if (!email) {
+            logger.warn(context, 'Failure Point R2: Missing email in resend request.');
+            return res.status(400).json({ success: false, message: 'Email is required.' });
+        }
+
+        // We use a JOIN to ensure the global guest is actually registered for this specific event
+        const query = `
+            SELECT g.full_name, er.access_code 
+            FROM guests g
+            JOIN event_registrations er ON g.id = er.guest_id
+            WHERE g.email = $1 AND er.event_id = $2;
+        `;
+        const result = await db.query(query, [email, event.id]);
+
+        if (result.rowCount === 0) {
+            logger.warn(context, `Failure Point R3: Resend failed. No ticket found for ${email} at ${eventSlug}`);
+            return res.status(404).json({ success: false, message: 'No registration found for this email.' });
+        }
+
+        // Safely map the database snake_case to our backend camelCase
+        const { full_name: fullName, access_code: accessCode } = result.rows[0];
+
+        // ARCHITECT NOTE: Fire-and-forget email retry using the patched email service
+        emailService.sendAccessCode(email, fullName, accessCode, event.name)
+            .then(() => {
+                logger.info(context, `Background email delivery successful for resend to: ${email}`);
+            })
+            .catch((emailError) => {
+                logger.error(context, `Failure Point R4-B: Background Email Resend Failed to ${email}.`, emailError);
+            });
+
+        // Immediately unblock the UI
+        res.status(200).json({ success: true, message: 'Access code resent successfully.' });
+
+    } catch (error) {
+        logger.error(context, 'Failure Point R5: CRITICAL FAILURE during resend access code.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+
 module.exports = {
     getGlobalGuests,
     registerGuest,
@@ -375,5 +448,6 @@ module.exports = {
     updateGuestState,
     guestLogin,
     getGuestStatus,
-    getGuestById 
+    getGuestById,
+    resendAccessCode
 };

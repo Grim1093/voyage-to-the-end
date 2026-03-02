@@ -205,6 +205,36 @@ export const loginGuest = async (eventSlug, email, accessCode) => {
     }
 };
 
+// ARCHITECT NOTE: New Recovery Fetcher for orphaned registrations
+export const resendAccessCode = async (eventSlug, email) => {
+    const context = `[Frontend API Service - resendAccessCode - ${eventSlug}]`;
+    console.log(`${context} Step 1: Initiating code recovery for ${email}`);
+
+    try {
+        const response = await fetch(`${API_URL}/guests/${eventSlug}/resend-code`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point R-F1: Server rejected code resend.`, data.message);
+            throw new Error(data.message || 'Failed to resend access code.');
+        }
+
+        console.log(`${context} Step 2: Code recovery network dispatch successful.`);
+        return data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error during code recovery.`, error.message);
+        throw error;
+    }
+};
+
 // --- NEW LIVE STATE SYNC PIPELINE ---
 export const fetchGuestStatus = async (eventSlug, guestId) => {
     const context = `[Frontend API Service - fetchGuestStatus - ${eventSlug}]`;
