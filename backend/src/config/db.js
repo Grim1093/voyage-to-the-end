@@ -1,15 +1,13 @@
 const { Pool } = require('pg');
 const logger = require('../utils/logger');
-require('dotenv').config(); // Load environment variables from our new .env file
+require('dotenv').config(); 
 
-// ARCHITECT NOTE: We are securely loading the string from the .env file.
 const connectionString = process.env.DATABASE_URL;
 
-// Initialize the Connection Pool using the official Aiven CA Certificate
 const pool = new Pool({
     connectionString: connectionString,
     ssl: {
-        rejectUnauthorized: true, // Security is ON
+        rejectUnauthorized: true, 
         ca: `-----BEGIN CERTIFICATE-----
 MIIEUDCCArigAwIBAgIUVa+Nhv5TGqyCrlQzyQxRMgKYCMUwDQYJKoZIhvcNAQEM
 BQAwQDE+MDwGA1UEAww1ZWVhZjk4OWUtZWQ2OS00ZDMzLWJlZDUtZWQyZjZjZDQ5
@@ -40,25 +38,38 @@ v2NVgg==
     }
 });
 
-/**
- * We immediately test the connection when the server starts.
- * This is "Failure Point 0" - if the database is down, we must know immediately.
- */
+const runSequenceSync = async () => {
+    const context = 'DB-Sync-Tool';
+    const client = await pool.connect();
+
+    try {
+        logger.info(context, 'Step 1: Running INT4 primary key sequence synchronization...');
+
+        // ARCHITECT NOTE: Only syncing the events table, ignoring UUID tables.
+        await client.query(`
+            SELECT setval(pg_get_serial_sequence('events', 'id'), COALESCE(MAX(id), 1)) FROM events;
+        `);
+
+        logger.info(context, 'Step 2: Sequence synchronization SUCCESS. Database is ready for new inserts.');
+
+    } catch (error) {
+        logger.error(context, 'Failure Point DB-SYNC: Sequence sync failed.', error);
+    } finally {
+        client.release();
+    }
+};
+
 const connectDB = async () => {
     try {
         logger.info('Database', 'Attempting to securely connect to Aiven PostgreSQL...');
         const client = await pool.connect();
-        
-        // If we reach this line, the connection was successful
         logger.info('Database', 'Successfully connected to PostgreSQL with verified SSL!');
-        
-        // Release the client back to the pool so it can be used by other queries
         client.release(); 
+
+        await runSequenceSync();
+
     } catch (error) {
-        // If the password is wrong, or the network drops, our custom logger catches it
-        logger.error('Database', 'CRITICAL FAILURE: Could not connect to PostgreSQL.', error);
-        
-        // If the DB is down, there is no point in running the app. We kill the process.
+        logger.error('Database', 'Failure Point DB-CONN: CRITICAL FAILURE: Could not connect to PostgreSQL.', error);
         process.exit(1); 
     }
 };
@@ -66,6 +77,5 @@ const connectDB = async () => {
 module.exports = {
     pool,
     connectDB,
-    // We export this helper function so our controllers can easily run SQL queries
     query: (text, params) => pool.query(text, params),
 };

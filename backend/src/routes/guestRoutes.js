@@ -5,49 +5,59 @@ const logger = require('../utils/logger');
 const { requireAdminKey } = require('../middleware/authMiddleware');
 
 /**
- * Route: POST /api/guests/register
- * Purpose: Receives the guest's form data and passes it to the controller logic.
+ * Route: POST /api/guests/:eventSlug/register
+ * Purpose: Receives the guest's form data for a specific event.
  */
-router.post('/register', (req, res) => {
-    logger.info('GuestRoutes', 'Incoming POST request to /api/guests/register');
+router.post('/:eventSlug/register', (req, res) => {
+    logger.info('GuestRoutes', `Incoming POST request to register for event: ${req.params.eventSlug}`);
+    if (!req.params.eventSlug) {
+        logger.warn('GuestRoutes', 'Failure Point R1: Missing eventSlug in register route.');
+    }
     guestController.registerGuest(req, res);
 });
 
 /**
- * Route: POST /api/guests/login
- * Purpose: Authenticates a guest using their email and 6-character access code.
+ * Route: POST /api/guests/:eventSlug/login
+ * Purpose: Authenticates a guest for a specific event using their email and 6-character access code.
  */
-router.post('/login', (req, res) => {
-    logger.info('GuestRoutes', 'Incoming POST request to /api/guests/login');
+router.post('/:eventSlug/login', (req, res) => {
+    logger.info('GuestRoutes', `Incoming POST request to login for event: ${req.params.eventSlug}`);
     guestController.guestLogin(req, res);
 });
 
 /**
- * Route: GET /api/guests/:id/status
- * Purpose: Lightweight endpoint to fetch the live verification state (0, 1, 2, -1) for the guest dashboard.
+ * Route: GET /api/guests/:eventSlug/:id/status
+ * Purpose: Lightweight endpoint to fetch the live verification state for the guest dashboard.
  */
-router.get('/:id/status', (req, res) => {
-    logger.info('GuestRoutes', `Incoming GET request to /api/guests/${req.params.id}/status`);
+router.get('/:eventSlug/:id/status', (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request to fetch status for guest ${req.params.id} at event: ${req.params.eventSlug}`);
     guestController.getGuestStatus(req, res);
 });
 
 /**
- * Route: GET /api/guests
- * Purpose: Retrieves a paginated list of guests.
- * Query Params: ?page=1 (defaults to 1)
+ * Route: GET /api/guests/:eventSlug
+ * Purpose: Retrieves a paginated list of guests for a specific event.
  */
-router.get('/', requireAdminKey, (req, res) => {
-    logger.info('GuestRoutes', `Incoming GET request to /api/guests. Query params: ${JSON.stringify(req.query)}`);
+router.get('/:eventSlug', requireAdminKey, (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request to fetch guest ledger for event: ${req.params.eventSlug}. Query params: ${JSON.stringify(req.query)}`);
     guestController.getAllGuests(req, res);
 });
 
 /**
- * Route: PATCH /api/guests/:id/state
- * Purpose: Updates the verification state (0, 1, 2, -1) of a specific guest.
- * Body: { "newState": 2, "errorLog": "Optional error reason if state is -1" }
+ * Route: GET /api/guests/:eventSlug/:id
+ * Purpose: Lazy-loads the extended details (PII) of a specific guest for the Admin Vault. Protected by middleware.
  */
-router.patch('/:id/state', requireAdminKey, (req, res) => {
-    logger.info('GuestRoutes', `Incoming PATCH request to /api/guests/${req.params.id}/state`);
+router.get('/:eventSlug/:id', requireAdminKey, (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request to fetch extended details for guest ${req.params.id} at event: ${req.params.eventSlug}`);
+    guestController.getGuestById(req, res);
+});
+
+/**
+ * Route: PATCH /api/guests/:eventSlug/:id/state
+ * Purpose: Updates the verification state (0, 1, 2, -1) of a specific guest within an event.
+ */
+router.patch('/:eventSlug/:id/state', requireAdminKey, (req, res) => {
+    logger.info('GuestRoutes', `Incoming PATCH request to update state for guest ${req.params.id} at event: ${req.params.eventSlug}`);
     guestController.updateGuestState(req, res);
 });
 

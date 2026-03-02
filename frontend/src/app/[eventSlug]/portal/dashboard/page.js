@@ -1,13 +1,16 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { fetchGuestStatus } from '../../../services/api'; 
+import { useRouter, useParams } from 'next/navigation';
+// ARCHITECT NOTE: Adjusted import path for the new deeper folder structure
+import { fetchGuestStatus } from '../../../../services/api'; 
 
 export default function GuestDashboard() {
-    const context = '[GuestDashboard Component]';
-    const router = useRouter();
+    const params = useParams();
+    const eventSlug = params.eventSlug;
+    const context = `[GuestDashboard Component - ${eventSlug}]`;
     
+    const router = useRouter();
     const [guest, setGuest] = useState(null);
 
     useEffect(() => {
@@ -16,7 +19,7 @@ export default function GuestDashboard() {
         
         if (!sessionData) {
             console.warn(`${context} Failure Point EE: Unauthorized access attempt. No guest data found. Redirecting to portal.`);
-            router.push('/portal');
+            router.push(`/${eventSlug}/portal`);
             return;
         }
 
@@ -28,7 +31,8 @@ export default function GuestDashboard() {
             const syncStatus = async () => {
                 try {
                     console.log(`${context} Step 3: Fetching live status from ledger for ID: ${parsedData.id}`);
-                    const liveState = await fetchGuestStatus(parsedData.id);
+                    // ARCHITECT NOTE: Passing eventSlug to the sync API
+                    const liveState = await fetchGuestStatus(eventSlug, parsedData.id);
                     
                     if (liveState !== parsedData.current_state) {
                         console.log(`${context} Step 4: State upgrade detected! Updating UI from ${parsedData.current_state} to ${liveState}`);
@@ -50,14 +54,14 @@ export default function GuestDashboard() {
         } catch (error) {
             console.error(`${context} Failure Point FF: Corrupted session data.`, error);
             sessionStorage.removeItem('guestData');
-            router.push('/portal');
+            router.push(`/${eventSlug}/portal`);
         }
-    }, [router]);
+    }, [router, eventSlug, context]);
 
     const handleLogout = () => {
         console.log(`${context} Step 5: Guest initiated logout. Purging session data.`);
         sessionStorage.removeItem('guestData');
-        router.push('/portal');
+        router.push(`/${eventSlug}/portal`);
     };
 
     if (!guest) {
@@ -90,7 +94,6 @@ export default function GuestDashboard() {
     return (
         <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6 md:p-12 relative overflow-hidden">
             
-            {/* Ambient Orbs to match the Login Screen */}
             <div className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] bg-purple-200/50 rounded-full filter blur-[120px] pointer-events-none -z-10"></div>
             <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-200/50 rounded-full filter blur-[120px] pointer-events-none -z-10"></div>
 
@@ -109,13 +112,11 @@ export default function GuestDashboard() {
                     </button>
                 </header>
 
-                {/* Banner Section */}
                 <div className="bg-white/70 backdrop-blur-xl shadow-lg rounded-2xl border border-white p-6 mb-6">
                     <h2 className="text-lg font-bold text-gray-800 mb-4 tracking-wide">Verification Status</h2>
                     {renderStateBanner(guest.current_state)}
                 </div>
 
-                {/* Dynamic Data Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div className="bg-white/70 backdrop-blur-xl shadow-lg rounded-2xl border border-white p-6">
                         <h2 className="text-lg font-bold text-gray-800 mb-5 tracking-wide flex items-center">
@@ -155,7 +156,7 @@ export default function GuestDashboard() {
                     </div>
                 </div>
 
-                {/* Static Event Itinerary Card */}
+                {/* Dynamic Event Itinerary Card */}
                 <div className="bg-white/70 backdrop-blur-xl shadow-xl rounded-2xl border border-white overflow-hidden">
                     <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-5">
                         <h2 className="text-lg font-bold text-white tracking-wide flex items-center">
@@ -167,17 +168,18 @@ export default function GuestDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
                             <div>
                                 <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Event</span>
-                                <span className="block text-gray-900 font-bold text-base">Global Tech & Finance Summit 2026</span>
+                                {/* ARCHITECT NOTE: Dynamically injecting the event name based on the slug */}
+                                <span className="block text-gray-900 font-bold text-base capitalize">{eventSlug.replace(/-/g, ' ')}</span>
                             </div>
                             <div>
-                                <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Dates</span>
-                                <span className="block text-gray-900 font-semibold text-base">October 15 - 18, 2026</span>
-                                <span className="block text-gray-500 text-xs mt-1.5 font-medium">Check-in starts 9:00 AM</span>
+                                <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Status</span>
+                                <span className="block text-gray-900 font-semibold text-base">To Be Announced</span>
+                                <span className="block text-gray-500 text-xs mt-1.5 font-medium">Pending Admin Update</span>
                             </div>
                             <div>
                                 <span className="block text-purple-600/80 font-bold mb-1.5 uppercase tracking-wider text-xs">Venue & Accommodation</span>
-                                <span className="block text-gray-900 font-semibold text-base">The Grand Hyatt Complex</span>
-                                <span className="block text-gray-500 text-xs mt-1.5 font-medium">Dubai, UAE</span>
+                                <span className="block text-gray-900 font-semibold text-base">Location TBD</span>
+                                <span className="block text-gray-500 text-xs mt-1.5 font-medium">Check back later</span>
                             </div>
                         </div>
                     </div>

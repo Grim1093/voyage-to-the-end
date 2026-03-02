@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { registerGuest } from '../services/api';
 
-export default function GuestIntakeForm() {
-    const context = '[GuestIntakeForm Component]';
+// ARCHITECT NOTE: We receive the eventSlug from the parent page wrapper
+export default function GuestIntakeForm({ eventSlug }) {
+    const context = `[GuestIntakeForm Component - ${eventSlug}]`;
 
     const [formData, setFormData] = useState({
         fullName: '',
@@ -36,8 +37,10 @@ export default function GuestIntakeForm() {
         }
 
         try {
-            console.log(`${context} Step 3: Validation passed. Handing off to API Service Layer.`);
-            const result = await registerGuest(formData);
+            console.log(`${context} Step 3: Validation passed. Handing off to API Service Layer for event: ${eventSlug}`);
+            
+            // ARCHITECT NOTE: Passing the eventSlug down to the service layer
+            const result = await registerGuest(eventSlug, formData);
             
             console.log(`${context} Step 4: UI received success confirmation. Guest State is initialized at 1.`);
             setStatus('success');

@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link'; // NEW: Imported for Hub Navigation
-import { loginGuest } from '../../services/api'; 
+import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link'; 
+import { loginGuest } from '../../../services/api'; 
 
 export default function GuestPortalLogin() {
-    const context = '[GuestPortalLogin Component]';
+    const params = useParams();
+    const eventSlug = params.eventSlug;
+    const context = `[GuestPortalLogin Component - ${eventSlug}]`;
+    
     const router = useRouter();
     
     const [formData, setFormData] = useState({ email: '', accessCode: '' });
-    const [status, setStatus] = useState('idle'); // idle, loading, error
+    const [status, setStatus] = useState('idle'); 
     const [message, setMessage] = useState('');
 
     const handleChange = (e) => {
@@ -23,7 +26,6 @@ export default function GuestPortalLogin() {
         setStatus('loading');
         setMessage('');
 
-        // Step 2: Frontend Validation (Failure Point CC)
         if (!formData.email || !formData.accessCode) {
             console.warn(`${context} Failure Point CC: Missing email or access code.`);
             setStatus('error');
@@ -32,16 +34,17 @@ export default function GuestPortalLogin() {
         }
 
         try {
-            console.log(`${context} Step 3: Hitting backend authentication endpoint...`);
+            console.log(`${context} Step 3: Hitting backend authentication endpoint for event: ${eventSlug}...`);
             
-            const result = await loginGuest(formData.email, formData.accessCode);
+            // ARCHITECT NOTE: Pass eventSlug to the API layer
+            const result = await loginGuest(eventSlug, formData.email, formData.accessCode);
             
             console.log(`${context} Step 4: Authentication successful! Storing guest state.`);
-            
             sessionStorage.setItem('guestData', JSON.stringify(result.data));
 
             console.log(`${context} Step 5: Redirecting to secure guest dashboard.`);
-            router.push('/portal/dashboard');
+            // ARCHITECT NOTE: Route to the dynamic dashboard
+            router.push(`/${eventSlug}/portal/dashboard`);
 
         } catch (error) {
             console.error(`${context} CRITICAL FAILURE (Failure Point DD):`, error.message);
@@ -61,9 +64,9 @@ export default function GuestPortalLogin() {
                 
                 {/* Navigation Breadcrumb */}
                 <div className="mb-6 flex justify-center">
-                    <Link href="/" className="inline-flex items-center text-xs font-medium text-purple-700 hover:text-purple-900 transition-colors bg-white/60 px-4 py-2 rounded-full border border-purple-100 backdrop-blur-md shadow-sm hover:shadow active:scale-95 transform duration-150">
+                    <Link href={`/${eventSlug}`} className="inline-flex items-center text-xs font-medium text-purple-700 hover:text-purple-900 transition-colors bg-white/60 px-4 py-2 rounded-full border border-purple-100 backdrop-blur-md shadow-sm hover:shadow active:scale-95 transform duration-150">
                         <svg className="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                        Return to Hub
+                        Return to Event Hub
                     </Link>
                 </div>
 
@@ -74,7 +77,7 @@ export default function GuestPortalLogin() {
                             <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         </div>
                         <h1 className="text-3xl font-extrabold text-gray-900 mb-2 tracking-tight">Guest Portal</h1>
-                        <p className="text-sm text-gray-500 font-medium">Track your verification status</p>
+                        <p className="text-sm text-gray-500 font-medium capitalize">{eventSlug.replace(/-/g, ' ')}</p>
                     </div>
 
                     <form onSubmit={handleLogin} className="space-y-6">

@@ -23,10 +23,15 @@ logger.info('ServerBoot', 'CORS middleware configured. Allowed origin: http://lo
 // Middleware: This allows our server to read JSON data sent from the frontend forms
 app.use(express.json());
 
-// Mount the Router (Wiring the Brain to the URL)
+// Mount the Routers (Wiring the Brain to the URL)
 const guestRoutes = require('./routes/guestRoutes');
 app.use('/api/guests', guestRoutes);
 logger.info('Server', 'Mounted guest routes at /api/guests');
+
+// ARCHITECT NOTE: Mounting our new Event Management Engine
+const eventRoutes = require('./routes/eventRoutes');
+app.use('/api/events', eventRoutes);
+logger.info('Server', 'Mounted event routes at /api/events');
 
 // Failure Point / DevOps Check: A simple route to verify the server is running
 app.get('/health', (req, res) => {
