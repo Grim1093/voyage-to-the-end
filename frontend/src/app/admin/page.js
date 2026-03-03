@@ -9,8 +9,7 @@ export default function MasterDashboard() {
     const context = '[Master Control Plane]';
     const router = useRouter();
 
-    // ARCHITECT NOTE: Upgraded tab state to include the historical ledger
-    const [activeTab, setActiveTab] = useState('active_events'); // 'active_events' | 'previous_events' | 'guests'
+    const [activeTab, setActiveTab] = useState('active_events'); 
     const [events, setEvents] = useState([]);
     const [globalGuests, setGlobalGuests] = useState([]);
     const [status, setStatus] = useState('loading'); 
@@ -110,44 +109,46 @@ export default function MasterDashboard() {
         }
     };
 
-    // ARCHITECT NOTE: The Smart Ledger Slicers
     const activeEvents = events.filter(e => !e.is_expired);
     const previousEvents = events.filter(e => e.is_expired);
 
-    // Dynamic rendering of the Event Cards to avoid repeating code
     const renderEventCards = (eventList) => {
         if (eventList.length === 0) {
-            return <div className="col-span-full py-20 text-center text-zinc-600 text-xs font-medium italic">No nodes detected in this ledger.</div>;
+            return (
+                <div className="col-span-full py-32 flex flex-col items-center justify-center border border-dashed border-white/[0.05] rounded-[32px] bg-white/[0.01]">
+                    <span className="text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase">No Data Permutations Found</span>
+                </div>
+            );
         }
         
         return eventList.map((event) => (
-            <div key={event.slug} className={`bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group ${event.is_expired ? 'opacity-70 grayscale-[50%]' : ''}`}>
-                <div className="flex justify-between items-start mb-6">
-                    <div className="w-10 h-10 bg-white/[0.03] rounded-2xl flex items-center justify-center border border-white/[0.08] text-xs font-bold text-zinc-400">
+            <div key={event.slug} className={`bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
+                <div className="flex justify-between items-start mb-8">
+                    <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08] text-sm font-light text-zinc-300 shadow-inner">
                         {event.slug.charAt(0).toUpperCase()}
                     </div>
-                    <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
-                        <span className={`w-1 h-1 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
+                    <span className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
                         {event.is_expired ? 'Archived' : event.is_public ? 'Public' : 'Private'}
                     </span>
                 </div>
-                <h3 className="text-lg font-medium text-white mb-1 truncate">{event.title}</h3>
+                <h3 className="text-xl font-medium text-white mb-2 tracking-tight truncate">{event.title}</h3>
                 
                 <a 
                     href={`/${event.slug}`} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="text-zinc-500 text-[10px] font-mono mb-8 hover:text-indigo-400 transition-colors underline decoration-zinc-800 underline-offset-4 flex items-center gap-1.5"
+                    className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-indigo-400 transition-colors flex items-center gap-2 w-fit group/link"
                 >
                     /{event.slug}
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    <svg className="w-3 h-3 opacity-0 -translate-x-2 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                 </a>
                 
                 <div className="mt-auto flex gap-3">
-                    <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-200 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest text-center transition-all">
-                        {event.is_expired ? 'View Data' : 'Manage Node'}
+                    <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white text-zinc-300 hover:text-black py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all shadow-inner">
+                        {event.is_expired ? 'View Ledger' : 'Manage Node'}
                     </Link>
-                    <Link href={`/admin/events/${event.slug}/edit`} className="w-11 h-11 flex items-center justify-center bg-white/[0.03] hover:bg-indigo-500/20 border border-white/[0.05] text-zinc-400 hover:text-indigo-400 rounded-full transition-all">
+                    <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                     </Link>
                 </div>
@@ -158,32 +159,35 @@ export default function MasterDashboard() {
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
             
-            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
-                <div className="absolute top-[-30%] w-[1000px] h-[800px] bg-white/[0.02] rounded-full filter blur-[100px]"></div>
-                <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]"></div>
+            {/* ARCHITECT NOTE: Pure Tailwind Animated Mesh Gradient */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '8s' }}></div>
+                <div className="absolute bottom-[-20%] right-[-10%] w-[700px] h-[700px] bg-purple-500/5 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '12s' }}></div>
+                <div className="absolute top-[40%] left-[50%] w-[500px] h-[500px] bg-rose-500/[0.03] rounded-full blur-[100px] -translate-x-1/2 -translate-y-1/2 animate-pulse" style={{ animationDuration: '10s' }}></div>
             </div>
 
-            <header className="w-full max-w-7xl flex items-center justify-between px-6 py-5 z-20">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-[11px] tracking-tighter">
+            <header className="w-full max-w-7xl flex items-center justify-between px-6 py-8 z-20 border-b border-white/[0.02]">
+                <div className="flex items-center gap-5">
+                    <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs tracking-tighter shadow-[0_0_20px_rgba(255,255,255,0.2)]">
                         NX
                     </div>
                     <div>
-                        <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Control Plane</h1>
-                        <p className="text-[9px] text-zinc-500 font-medium tracking-wide">Master Ledger Management</p>
+                        {/* ARCHITECT NOTE: Sharp typography applied safely */}
+                        <h1 className="text-3xl font-light text-white tracking-tight mb-1">Control Plane</h1>
+                        <p className="text-[9px] text-zinc-500 font-bold tracking-[0.3em] uppercase">Master Ledger Management</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                     <Link 
                         href="/admin/events/new"
-                        className="hidden sm:flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-black bg-white hover:bg-zinc-200 px-4 py-2 rounded-full transition-all"
+                        className="hidden sm:flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-black bg-white hover:bg-zinc-200 px-6 py-3 rounded-full transition-all shadow-[0_0_15px_rgba(255,255,255,0.15)]"
                     >
                         Deploy Tenant
                     </Link>
                     <button 
                         onClick={handleLockVault}
-                        className="flex items-center gap-2 text-[10px] font-bold tracking-widest uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] px-4 py-2 rounded-full backdrop-blur-md"
+                        className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] px-6 py-3 rounded-full backdrop-blur-md"
                     >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
                         Lock Vault
@@ -191,36 +195,35 @@ export default function MasterDashboard() {
                 </div>
             </header>
 
-            <div className="max-w-7xl w-full z-10 flex flex-col px-6 pb-12">
+            <div className="max-w-7xl w-full z-10 flex flex-col px-6 pb-16 pt-8">
                 
-                <div className="flex space-x-8 mb-10 mt-4 border-b border-white/[0.03]">
+                <div className="flex space-x-10 mb-12">
                     <button 
                         onClick={() => setActiveTab('active_events')} 
-                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'active_events' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`pb-3 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'active_events' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
                     >
                         Active Tenants
-                        {activeTab === 'active_events' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
+                        {activeTab === 'active_events' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-white rounded-t-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></span>}
                     </button>
-                    {/* ARCHITECT NOTE: The New Historical Ledger Tab */}
                     <button 
                         onClick={() => setActiveTab('previous_events')} 
-                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'previous_events' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`pb-3 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'previous_events' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
                     >
                         Historical Nodes
-                        {activeTab === 'previous_events' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
+                        {activeTab === 'previous_events' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-white rounded-t-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></span>}
                     </button>
                     <button 
                         onClick={() => setActiveTab('guests')} 
-                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'guests' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`pb-3 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'guests' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
                     >
                         Global Directory
-                        {activeTab === 'guests' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
+                        {activeTab === 'guests' && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-white rounded-t-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"></span>}
                     </button>
                 </div>
 
                 {status === 'loading' ? (
                     <div className="flex flex-col items-center justify-center py-32">
-                        <svg className="animate-spin h-5 w-5 text-zinc-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-6 w-6 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -238,33 +241,37 @@ export default function MasterDashboard() {
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-white/[0.03]">
-                                        <th className="px-8 py-5 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Global Identity</th>
-                                        <th className="px-8 py-5 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Communication</th>
-                                        <th className="px-8 py-5 text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Entry Date</th>
-                                        <th className="px-8 py-5 text-right text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Action</th>
+                                    <tr className="border-b border-white/[0.02] bg-white/[0.01]">
+                                        <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Global Identity</th>
+                                        <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Communication</th>
+                                        <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Entry Date</th>
+                                        <th className="px-8 py-6 text-right text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/[0.02]">
-                                    {globalGuests.map((guest) => (
+                                    {globalGuests.length === 0 ? (
+                                        <tr>
+                                            <td colSpan="4" className="py-20 text-center text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase border-dashed border-t border-white/[0.05]">No guests located in ledger.</td>
+                                        </tr>
+                                    ) : globalGuests.map((guest) => (
                                         <tr key={guest.id} className="group hover:bg-white/[0.02] transition-colors">
-                                            <td className="px-8 py-5">
-                                                <div className="text-sm font-medium text-zinc-200">{guest.full_name}</div>
-                                                <div className="text-[10px] text-zinc-600 font-mono mt-1">{guest.id}</div>
+                                            <td className="px-8 py-6">
+                                                <div className="text-sm font-medium text-zinc-200 tracking-tight">{guest.full_name}</div>
+                                                <div className="text-[10px] text-zinc-600 font-mono mt-1.5">{guest.id}</div>
                                             </td>
-                                            <td className="px-8 py-5">
+                                            <td className="px-8 py-6">
                                                 <div className="text-xs text-zinc-400">{guest.email}</div>
-                                                <div className="text-[10px] text-zinc-600 mt-1">{guest.phone || 'No phone'}</div>
+                                                <div className="text-[10px] text-zinc-600 mt-1.5">{guest.phone || 'No phone'}</div>
                                             </td>
-                                            <td className="px-8 py-5 text-[10px] font-mono text-zinc-500">
+                                            <td className="px-8 py-6 text-[10px] font-mono text-zinc-500">
                                                 {new Date(guest.created_at).toLocaleDateString()}
                                             </td>
-                                            <td className="px-8 py-5 text-right">
+                                            <td className="px-8 py-6 text-right">
                                                 <button 
                                                     onClick={() => setSelectedGlobalGuest(guest)}
-                                                    className="text-[10px] font-bold tracking-widest uppercase px-4 py-2 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-400 hover:text-white hover:bg-white/[0.08] transition-all"
+                                                    className="text-[9px] font-bold tracking-[0.2em] uppercase px-5 py-2.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-400 hover:text-white hover:bg-white hover:text-black transition-all"
                                                 >
-                                                    Vault Profile
+                                                    View Vault
                                                 </button>
                                             </td>
                                         </tr>
@@ -282,7 +289,7 @@ export default function MasterDashboard() {
                         <div className="p-10">
                             <div className="flex justify-between items-start mb-10">
                                 <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.1] text-white font-medium text-2xl">
+                                    <div className="w-16 h-16 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.1] text-white font-medium text-2xl shadow-inner">
                                         {selectedGlobalGuest.full_name.charAt(0)}
                                     </div>
                                     <div>
@@ -295,7 +302,7 @@ export default function MasterDashboard() {
                                 </button>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-8 mb-10 p-6 bg-white/[0.02] rounded-[32px] border border-white/[0.05]">
+                            <div className="grid grid-cols-2 gap-8 mb-10 p-6 bg-white/[0.02] rounded-[32px] border border-white/[0.05] shadow-inner">
                                 <div className="space-y-1">
                                     <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Network Email</span>
                                     <p className="text-xs text-zinc-300">{selectedGlobalGuest.email}</p>
@@ -327,7 +334,7 @@ export default function MasterDashboard() {
                             </div>
                         </div>
                         <div className="px-10 py-6 bg-white/[0.02] border-t border-white/[0.05] flex justify-end">
-                            <button onClick={() => setSelectedGlobalGuest(null)} className="text-[10px] font-bold tracking-widest uppercase px-6 py-3 rounded-full bg-white text-black transition-all hover:bg-zinc-200">
+                            <button onClick={() => setSelectedGlobalGuest(null)} className="text-[10px] font-bold tracking-widest uppercase px-6 py-3 rounded-full bg-white text-black transition-all hover:bg-zinc-200 shadow-[0_0_15px_rgba(255,255,255,0.15)]">
                                 Close Vault
                             </button>
                         </div>

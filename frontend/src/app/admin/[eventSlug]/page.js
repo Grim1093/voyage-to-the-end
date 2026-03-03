@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link'; 
 import { getAllGuests, updateGuestState, fetchGuestDetails } from '../../../services/api';
+import { LumaDropdown } from '@/components/ui/luma-dropdown';
 
 export default function GuestLedgerDashboard() {
     const params = useParams();
@@ -86,7 +87,6 @@ export default function GuestLedgerDashboard() {
         router.push('/admin/login');
     };
 
-    // ARCHITECT NOTE: Restored missing pagination handlers
     const handleNextPage = () => {
         if (currentPage < totalPages) fetchLedger(currentPage + 1, limit);
     };
@@ -95,8 +95,8 @@ export default function GuestLedgerDashboard() {
         if (currentPage > 1) fetchLedger(currentPage - 1, limit);
     };
 
-    const handleLimitChange = (e) => {
-        const newLimit = parseInt(e.target.value);
+    const handleLimitChange = (newLimitValue) => {
+        const newLimit = parseInt(newLimitValue);
         setLimit(newLimit);
         fetchLedger(1, newLimit); 
     };
@@ -110,6 +110,12 @@ export default function GuestLedgerDashboard() {
             default: return <span className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest">N/A</span>;
         }
     };
+
+    const limitOptions = [
+        { label: '10 Nodes', value: 10 },
+        { label: '25 Nodes', value: 25 },
+        { label: '50 Nodes', value: 50 }
+    ];
 
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
@@ -155,8 +161,10 @@ export default function GuestLedgerDashboard() {
                         </svg>
                     </div>
                 ) : (
-                    <div className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">
-                        <div className="overflow-x-auto">
+                    <div className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] shadow-2xl">
+                        {/* ARCHITECT NOTE: Removed overflow-hidden from parent to allow the absolute dropdown to pop out */}
+                        {/* We add overflow-x-auto to just the table so horizontal scrolling still works on mobile */}
+                        <div className="overflow-x-auto rounded-t-[32px]">
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-white/[0.03] bg-white/[0.01]">
@@ -210,19 +218,21 @@ export default function GuestLedgerDashboard() {
                                 <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
                                     Displaying <span className="text-zinc-400">{((currentPage - 1) * limit) + 1} - {Math.min(currentPage * limit, totalGuests)}</span> of {totalGuests} entries
                                 </div>
-                                <div className="flex items-center gap-6">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-[10px] font-bold text-zinc-600 uppercase">Per Node:</span>
-                                        <select value={limit} onChange={handleLimitChange} className="bg-transparent text-zinc-400 text-xs font-bold outline-none cursor-pointer hover:text-white">
-                                            <option value={10}>10</option><option value={25}>25</option><option value={50}>50</option>
-                                        </select>
+                                <div className="flex items-center gap-6 relative z-50">
+                                    <div className="flex items-center gap-3 w-40">
+                                        <LumaDropdown 
+                                            value={limit}
+                                            onChange={handleLimitChange}
+                                            options={limitOptions}
+                                            direction="up"
+                                        />
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <button onClick={handlePrevPage} disabled={currentPage === 1} className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center disabled:opacity-30 hover:bg-white/[0.08] transition-all">
+                                        <button onClick={handlePrevPage} disabled={currentPage === 1} className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center disabled:opacity-30 hover:bg-white/[0.08] transition-all relative z-10">
                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                                         </button>
                                         <span className="text-[10px] font-mono text-zinc-500 uppercase">{currentPage} / {totalPages}</span>
-                                        <button onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0} className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center disabled:opacity-30 hover:bg-white/[0.08] transition-all">
+                                        <button onClick={handleNextPage} disabled={currentPage === totalPages || totalPages === 0} className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center disabled:opacity-30 hover:bg-white/[0.08] transition-all relative z-10">
                                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                         </button>
                                     </div>
@@ -234,7 +244,7 @@ export default function GuestLedgerDashboard() {
             </div>
 
             {selectedGuest && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
                     <div className="bg-zinc-950 border border-white/[0.08] rounded-[40px] shadow-2xl w-full max-w-xl overflow-hidden">
                         <div className="p-10">
                             <div className="flex justify-between items-start mb-8">
