@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const eventController = require('../controllers/eventController');
 const logger = require('../utils/logger');
+// ARCHITECT NOTE: The Gatekeeper middleware
 const { requireAdminKey } = require('../middleware/authMiddleware');
 
 /**
@@ -48,6 +49,16 @@ router.get('/:eventSlug', (req, res) => {
 router.patch('/:eventSlug', requireAdminKey, (req, res) => {
     logger.info('EventRoutes', `Incoming PATCH request to update event: ${req.params.eventSlug}`);
     eventController.updateEvent(req, res);
+});
+
+/**
+ * Route: DELETE /api/events/:eventSlug
+ * Purpose: Admin executes the destructive purge protocol. Strictly protected.
+ */
+// ARCHITECT NOTE: Injected requireAdminKey to secure the endpoint!
+router.delete('/:eventSlug', requireAdminKey, (req, res) => {
+    logger.info('EventRoutes', `Incoming DELETE request to purge tenant: ${req.params.eventSlug}`);
+    eventController.deleteEvent(req, res);
 });
 
 module.exports = router;

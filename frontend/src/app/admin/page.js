@@ -9,7 +9,8 @@ export default function MasterDashboard() {
     const context = '[Master Control Plane]';
     const router = useRouter();
 
-    const [activeTab, setActiveTab] = useState('events'); // 'events' | 'guests'
+    // ARCHITECT NOTE: Upgraded tab state to include the historical ledger
+    const [activeTab, setActiveTab] = useState('active_events'); // 'active_events' | 'previous_events' | 'guests'
     const [events, setEvents] = useState([]);
     const [globalGuests, setGlobalGuests] = useState([]);
     const [status, setStatus] = useState('loading'); 
@@ -55,7 +56,7 @@ export default function MasterDashboard() {
         };
 
         if (validateGatekeeper()) {
-            if (activeTab === 'events') {
+            if (activeTab === 'active_events' || activeTab === 'previous_events') {
                 loadTenants();
             } else {
                 loadGlobalGuests();
@@ -99,7 +100,6 @@ export default function MasterDashboard() {
         router.push('/admin/login');
     };
 
-    // ARCHITECT NOTE: Status indicators now use the "Dot + Text" blend style with no container
     const renderStateBadge = (state) => {
         switch(state) {
             case 0: return <span className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-zinc-600"></span> Invited</span>;
@@ -108,6 +108,51 @@ export default function MasterDashboard() {
             case -1: return <span className="flex items-center gap-1.5 text-rose-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-rose-500"></span> Action</span>;
             default: return <span className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest">N/A</span>;
         }
+    };
+
+    // ARCHITECT NOTE: The Smart Ledger Slicers
+    const activeEvents = events.filter(e => !e.is_expired);
+    const previousEvents = events.filter(e => e.is_expired);
+
+    // Dynamic rendering of the Event Cards to avoid repeating code
+    const renderEventCards = (eventList) => {
+        if (eventList.length === 0) {
+            return <div className="col-span-full py-20 text-center text-zinc-600 text-xs font-medium italic">No nodes detected in this ledger.</div>;
+        }
+        
+        return eventList.map((event) => (
+            <div key={event.slug} className={`bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group ${event.is_expired ? 'opacity-70 grayscale-[50%]' : ''}`}>
+                <div className="flex justify-between items-start mb-6">
+                    <div className="w-10 h-10 bg-white/[0.03] rounded-2xl flex items-center justify-center border border-white/[0.08] text-xs font-bold text-zinc-400">
+                        {event.slug.charAt(0).toUpperCase()}
+                    </div>
+                    <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
+                        <span className={`w-1 h-1 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
+                        {event.is_expired ? 'Archived' : event.is_public ? 'Public' : 'Private'}
+                    </span>
+                </div>
+                <h3 className="text-lg font-medium text-white mb-1 truncate">{event.title}</h3>
+                
+                <a 
+                    href={`/${event.slug}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="text-zinc-500 text-[10px] font-mono mb-8 hover:text-indigo-400 transition-colors underline decoration-zinc-800 underline-offset-4 flex items-center gap-1.5"
+                >
+                    /{event.slug}
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                </a>
+                
+                <div className="mt-auto flex gap-3">
+                    <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-200 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest text-center transition-all">
+                        {event.is_expired ? 'View Data' : 'Manage Node'}
+                    </Link>
+                    <Link href={`/admin/events/${event.slug}/edit`} className="w-11 h-11 flex items-center justify-center bg-white/[0.03] hover:bg-indigo-500/20 border border-white/[0.05] text-zinc-400 hover:text-indigo-400 rounded-full transition-all">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </Link>
+                </div>
+            </div>
+        ));
     };
 
     return (
@@ -150,11 +195,19 @@ export default function MasterDashboard() {
                 
                 <div className="flex space-x-8 mb-10 mt-4 border-b border-white/[0.03]">
                     <button 
-                        onClick={() => setActiveTab('events')} 
-                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'events' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        onClick={() => setActiveTab('active_events')} 
+                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'active_events' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         Active Tenants
-                        {activeTab === 'events' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
+                        {activeTab === 'active_events' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
+                    </button>
+                    {/* ARCHITECT NOTE: The New Historical Ledger Tab */}
+                    <button 
+                        onClick={() => setActiveTab('previous_events')} 
+                        className={`pb-4 text-[11px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'previous_events' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    >
+                        Historical Nodes
+                        {activeTab === 'previous_events' && <span className="absolute bottom-0 left-0 w-full h-[1px] bg-white"></span>}
                     </button>
                     <button 
                         onClick={() => setActiveTab('guests')} 
@@ -172,46 +225,13 @@ export default function MasterDashboard() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                     </div>
-                ) : activeTab === 'events' ? (
+                ) : activeTab === 'active_events' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {events.length === 0 ? (
-                            <div className="col-span-full py-20 text-center text-zinc-600 text-xs font-medium italic">No active nodes detected.</div>
-                        ) : (
-                            events.map((event) => (
-                                <div key={event.slug} className="bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group">
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="w-10 h-10 bg-white/[0.03] rounded-2xl flex items-center justify-center border border-white/[0.08] text-xs font-bold text-zinc-400">
-                                            {event.slug.charAt(0).toUpperCase()}
-                                        </div>
-                                        {/* ARCHITECT NOTE: Seamless blend for Public/Private indicators */}
-                                        <span className={`flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest ${event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
-                                            <span className={`w-1 h-1 rounded-full ${event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
-                                            {event.is_public ? 'Public' : 'Private'}
-                                        </span>
-                                    </div>
-                                    <h3 className="text-lg font-medium text-white mb-1 truncate">{event.title}</h3>
-                                    
-                                    <a 
-                                        href={`/${event.slug}`} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className="text-zinc-500 text-[10px] font-mono mb-8 hover:text-indigo-400 transition-colors underline decoration-zinc-800 underline-offset-4 flex items-center gap-1.5"
-                                    >
-                                        /{event.slug}
-                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                    </a>
-                                    
-                                    <div className="mt-auto flex gap-3">
-                                        <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-200 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest text-center transition-all">
-                                            Manage Node
-                                        </Link>
-                                        <Link href={`/admin/events/${event.slug}/edit`} className="w-11 h-11 flex items-center justify-center bg-white/[0.03] hover:bg-indigo-500/20 border border-white/[0.05] text-zinc-400 hover:text-indigo-400 rounded-full transition-all">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                        </Link>
-                                    </div>
-                                </div>
-                            ))
-                        )}
+                        {renderEventCards(activeEvents)}
+                    </div>
+                ) : activeTab === 'previous_events' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {renderEventCards(previousEvents)}
                     </div>
                 ) : (
                     <div className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">

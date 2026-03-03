@@ -9,28 +9,34 @@ const pool = new Pool({
 });
 
 const runMigration = async () => {
-    const context = '[Database Migration]';
+    const context = '[Event Chronology Migration]';
     console.log(`${context} Step 1: Initializing connection to Aiven PostgreSQL ledger...`);
 
     try {
-        // The SQL command to upgrade our schema
-        const query = `ALTER TABLE guests ADD COLUMN access_code VARCHAR(10);`;
+        // Phase 1: Purge the old string-based column
+        const dropQuery = `ALTER TABLE events DROP COLUMN IF EXISTS event_date;`;
         
-        console.log(`${context} Step 2: Executing schema upgrade...`);
-        await pool.query(query);
+        // Phase 2: Inject the new structured timestamp columns
+        const addQuery = `
+            ALTER TABLE events 
+            ADD COLUMN start_date TIMESTAMP WITH TIME ZONE,
+            ADD COLUMN end_date TIMESTAMP WITH TIME ZONE;
+        `;
         
-        console.log(`${context} Step 3: SUCCESS. The 'access_code' column has been securely added to the guests table.`);
+        console.log(`${context} Step 2: Executing schema downgrade (Dropping legacy 'event_date' varchar)...`);
+        await pool.query(dropQuery);
+        
+        console.log(`${context} Step 3: Executing schema upgrade (Injecting 'start_date' and 'end_date' timestamps)...`);
+        await pool.query(addQuery);
+        
+        console.log(`${context} Step 4: SUCCESS. The events node has been securely upgraded to the new chronological architecture.`);
     } catch (error) {
-        // Failure Point Z: Catching any SQL syntax errors or connection drops
-        console.error(`${context} CRITICAL FAILURE (Failure Point Z): Schema migration failed.`, error.message);
-        
-        if (error.code === '42701') {
-            console.warn(`${context} Note: Column 'access_code' already exists. No harm done!`);
-        }
+        // Failure Point DB-Migrate: Catching any SQL syntax errors or connection drops
+        console.error(`${context} CRITICAL FAILURE (Failure Point DB-Migrate): Schema migration failed.`, error.message);
     } finally {
         // Always close the connection so the script doesn't hang forever
         await pool.end();
-        console.log(`${context} Step 4: Database connection securely closed.`);
+        console.log(`${context} Step 5: Database connection securely closed.`);
     }
 };
 

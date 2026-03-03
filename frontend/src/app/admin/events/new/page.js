@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-// ARCHITECT NOTE: Corrected the import path! 4 levels up to reach src/services/api
 import { createEvent } from '../../../../services/api';
 
 export default function NewEventDeployment() {
@@ -13,17 +12,17 @@ export default function NewEventDeployment() {
     const [formData, setFormData] = useState({
         name: '',
         slug: '',
-        eventDate: '',
+        startDate: '',
+        endDate: '',
         location: '',
         description: '',
         isPublic: true
     });
 
-    const [status, setStatus] = useState('idle'); // idle, loading, success, error
+    const [status, setStatus] = useState('idle'); 
     const [message, setMessage] = useState('');
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
-    // Gatekeeper: Ensure only active Admins can view this deployment console
     useEffect(() => {
         const validateGatekeeper = () => {
             const sessionString = sessionStorage.getItem('adminSession');
@@ -75,9 +74,27 @@ export default function NewEventDeployment() {
             return;
         }
 
+        if (formData.startDate && formData.endDate) {
+            if (new Date(formData.startDate) >= new Date(formData.endDate)) {
+                setStatus('error');
+                setMessage('The Start Time must be earlier than the End Time.');
+                return;
+            }
+        }
+
         setStatus('loading');
         try {
-            await createEvent(formData);
+            // ARCHITECT NOTE: The Timezone Lock
+            // We convert the raw local browser string into a globally aware UTC ISO String
+            // This stops 00:00 from shifting to 5:30 AM in India!
+            console.log(`${context} Step 1.5: Applying timezone locks to payload...`);
+            const payload = {
+                ...formData,
+                startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
+                endDate: formData.endDate ? new Date(formData.endDate).toISOString() : null
+            };
+
+            await createEvent(payload);
             console.log(`${context} Step 2: Tenant deployed successfully.`);
             setStatus('success');
             setMessage(`Tenant "${formData.name}" has been successfully provisioned.`);
@@ -99,7 +116,7 @@ export default function NewEventDeployment() {
                     </div>
                     <h1 className="text-3xl font-medium text-white mb-4 tracking-tight">Deployment Complete</h1>
                     <p className="text-zinc-500 mb-10 leading-relaxed text-sm tracking-wide">
-                        {message} The new isolated environment is now routing live.
+                        {message} The new chronological environment is now routing live.
                     </p>
                     <div className="flex flex-col gap-4">
                         <Link href={`/${formData.slug}`} className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
@@ -116,14 +133,6 @@ export default function NewEventDeployment() {
 
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
-            
-            {/* Ambient Background Depth */}
-            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
-                <div className="absolute top-[-30%] w-[1000px] h-[800px] bg-white/[0.02] rounded-full filter blur-[100px]"></div>
-                <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]"></div>
-            </div>
-
-            {/* Seamless Top Navigation Bar */}
             <header className="w-full max-w-7xl flex items-center justify-between px-6 py-5 z-20">
                 <div className="flex items-center gap-4">
                     <Link href="/admin" className="w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.1] transition-all">
@@ -139,7 +148,6 @@ export default function NewEventDeployment() {
             <div className="max-w-2xl w-full z-10 relative px-6 pb-16 pt-8">
                 <div className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl">
                     <form onSubmit={handleSubmit} className="p-10 space-y-10">
-                        
                         {status === 'error' && (
                             <div className="p-4 bg-rose-500/5 border border-rose-500/10 text-rose-400/80 text-xs font-medium rounded-2xl tracking-wide">
                                 {message}
@@ -181,27 +189,37 @@ export default function NewEventDeployment() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Event Date</label>
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Start Time</label>
                                     <input 
-                                        type="text" 
-                                        name="eventDate"
-                                        value={formData.eventDate}
+                                        type="datetime-local" 
+                                        name="startDate"
+                                        value={formData.startDate}
                                         onChange={handleChange}
-                                        placeholder="Oct 15-18, 2026"
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm shadow-inner [color-scheme:dark]"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Location</label>
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">End Time</label>
                                     <input 
-                                        type="text" 
-                                        name="location"
-                                        value={formData.location}
+                                        type="datetime-local" 
+                                        name="endDate"
+                                        value={formData.endDate}
                                         onChange={handleChange}
-                                        placeholder="New Delhi, India"
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm shadow-inner [color-scheme:dark]"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Location</label>
+                                <input 
+                                    type="text" 
+                                    name="location"
+                                    value={formData.location}
+                                    onChange={handleChange}
+                                    placeholder="New Delhi, India"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                />
                             </div>
 
                             <div className="space-y-2">

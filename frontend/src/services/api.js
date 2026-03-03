@@ -443,3 +443,39 @@ export const fetchGlobalGuests = async (page = 1, limit = 50) => {
         throw error;
     }
 };
+
+// ARCHITECT NOTE: The Destructive Purge Protocol
+export const deleteEvent = async (eventSlug) => {
+    const context = `[Frontend API Service - deleteEvent - ${eventSlug}]`;
+    console.log(`${context} Step 1: Initiating destructive purge protocol for tenant ${eventSlug}...`);
+
+    try {
+        const adminKey = getValidSessionKey(context);
+
+        if (!adminKey) {
+            throw new Error('Unauthorized: Please log in to perform this action.');
+        }
+
+        const response = await fetch(`${API_URL}/events/${eventSlug}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-admin-key': adminKey
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point EV-F5: Server rejected event deletion.`, data.message);
+            throw new Error(data.message || 'Failed to delete the event.');
+        }
+
+        console.log(`${context} Step 2: Tenant environment successfully obliterated.`);
+        return data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error during event deletion.`, error.message);
+        throw error;
+    }
+};

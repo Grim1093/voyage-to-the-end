@@ -3,13 +3,14 @@ const logger = require('../utils/logger');
 
 const getPublicEvents = async (req, res) => {
     const context = 'EventController - getPublicEvents';
-    logger.info(context, 'Fetching all public events for Global Hub.');
+    logger.info(context, 'Fetching all public, active events for Global Hub.');
 
     try {
         const query = `
-            SELECT slug, name as title, event_date as date, description as desc, location 
+            SELECT slug, name as title, start_date, end_date, description as desc, location 
             FROM events 
             WHERE is_public = TRUE 
+            AND (end_date IS NULL OR end_date > CURRENT_TIMESTAMP)
             ORDER BY created_at DESC;
         `;
         const result = await db.query(query);
@@ -24,15 +25,14 @@ const getPublicEvents = async (req, res) => {
     }
 };
 
-// ARCHITECT NOTE: The New Master Control Plane Fetcher
 const getAllAdminEvents = async (req, res) => {
     const context = 'EventController - getAllAdminEvents';
-    logger.info(context, 'Admin fetching ALL tenants (public and private) for Master Control Plane.');
+    logger.info(context, 'Admin fetching ALL tenants for Master Control Plane.');
 
     try {
-        // Notice there is no 'WHERE is_public = TRUE' filter here!
         const query = `
-            SELECT id, slug, name as title, event_date as date, description as desc, location, is_public 
+            SELECT id, slug, name as title, start_date, end_date, description as desc, location, is_public,
+                   (end_date IS NOT NULL AND end_date < CURRENT_TIMESTAMP) as is_expired
             FROM events 
             ORDER BY created_at DESC;
         `;
@@ -55,7 +55,8 @@ const getEventBySlug = async (req, res) => {
 
     try {
         const query = `
-            SELECT slug, name as title, event_date as date, description as desc, location, is_public 
+            SELECT slug, name as title, start_date, end_date, description as desc, location, is_public,
+                   (end_date IS NOT NULL AND end_date < CURRENT_TIMESTAMP) as is_expired
             FROM events 
             WHERE slug = $1;
         `;
@@ -78,36 +79,49 @@ const getEventBySlug = async (req, res) => {
 
 const createEvent = async (req, res) => {
     const context = 'EventController - createEvent';
-    logger.info(context, 'Admin attempting to create a new event.');
+    logger.info(context, 'Step 1: Admin attempting to deploy a new tenant.');
 
     try {
-        const { name, slug, description, eventDate, location, isPublic } = req.body;
+        const { name, slug, description, startDate, endDate, location, isPublic } = req.body;
 
         if (!name || !slug) {
-            logger.warn(context, 'Failure Point EV4: Missing required fields (name or slug).');
             return res.status(400).json({ success: false, message: 'Event Name and Slug are required.' });
         }
 
-        const checkQuery = `SELECT id FROM events WHERE slug = $1;`;
-        const checkResult = await db.query(checkQuery, [slug]);
+        // ARCHITECT NOTE: Strict Dual-Uniqueness Protocol (Case-Insensitive)
+        logger.info(context, 'Step 2: Scanning ledger for Name or Slug collisions...');
+        const checkQuery = `SELECT slug, name FROM events WHERE slug = $1 OR name ILIKE $2;`;
+        const checkResult = await db.query(checkQuery, [slug, name]);
 
         if (checkResult.rowCount > 0) {
-            logger.warn(context, `Failure Point EV5: Slug already exists: ${slug}`);
-            return res.status(409).json({ success: false, message: 'An event with this URL slug already exists.' });
+            const collision = checkResult.rows[0];
+            if (collision.slug === slug) {
+                logger.warn(context, 'Failure Point EV-Deploy: Slug collision detected.');
+                return res.status(409).json({ success: false, message: 'An event with this URL slug already exists.' });
+            }
+            if (collision.name.toLowerCase() === name.toLowerCase()) {
+                logger.warn(context, 'Failure Point EV-Deploy: Name collision detected.');
+                return res.status(409).json({ success: false, message: 'An event with this exact Name already exists.' });
+            }
         }
 
+        logger.info(context, 'Step 3: Collision check passed. Inserting into database...');
         const insertQuery = `
-            INSERT INTO events (name, slug, description, event_date, location, is_public)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO events (name, slug, description, start_date, end_date, location, is_public)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id, name, slug, is_public;
         `;
+        
         const publicFlag = isPublic !== undefined ? isPublic : true;
-        const values = [name, slug, description, eventDate, location, publicFlag];
+        const safeStartDate = startDate ? startDate : null;
+        const safeEndDate = endDate ? endDate : null;
+
+        const values = [name, slug, description, safeStartDate, safeEndDate, location, publicFlag];
 
         const result = await db.query(insertQuery, values);
         const newEvent = result.rows[0];
 
-        logger.info(context, `Successfully created new event: ${newEvent.slug} (ID: ${newEvent.id})`);
+        logger.info(context, `Step 4: Successfully deployed new tenant: ${newEvent.slug}`);
 
         res.status(201).json({
             success: true,
@@ -116,7 +130,7 @@ const createEvent = async (req, res) => {
         });
 
     } catch (error) {
-        logger.error(context, 'Failure Point EV6: CRITICAL FAILURE creating event.', error);
+        logger.error(context, 'Failure Point EV6: CRITICAL FAILURE deploying tenant.', error);
         res.status(500).json({ success: false, message: 'Internal server error.' });
     }
 };
@@ -124,50 +138,61 @@ const createEvent = async (req, res) => {
 const updateEvent = async (req, res) => {
     const context = 'EventController - updateEvent';
     const currentSlug = req.params.eventSlug;
-    logger.info(context, `Admin attempting to update event: ${currentSlug}`);
+    logger.info(context, `Step 1: Admin attempting to update tenant: ${currentSlug}`);
 
     try {
-        const { name, slug, description, eventDate, location, isPublic } = req.body;
+        const { name, slug, description, startDate, endDate, location, isPublic } = req.body;
 
         if (!name || !slug) {
-            logger.warn(context, 'Failure Point EV7: Missing required fields for update.');
             return res.status(400).json({ success: false, message: 'Event Name and Slug are required.' });
         }
 
+        logger.info(context, 'Step 2: Verifying target tenant exists...');
         const checkExistQuery = `SELECT id FROM events WHERE slug = $1;`;
         const existResult = await db.query(checkExistQuery, [currentSlug]);
 
         if (existResult.rowCount === 0) {
-            logger.warn(context, `Failure Point EV8: Target event not found: ${currentSlug}`);
+            logger.warn(context, `Failure Point EV-Update: Target tenant not found: ${currentSlug}`);
             return res.status(404).json({ success: false, message: 'Event not found.' });
         }
 
         const eventId = existResult.rows[0].id;
 
-        if (currentSlug !== slug) {
-            const checkSlugQuery = `SELECT id FROM events WHERE slug = $1 AND id != $2;`;
-            const slugResult = await db.query(checkSlugQuery, [slug, eventId]);
-            
-            if (slugResult.rowCount > 0) {
-                logger.warn(context, `Failure Point EV9: Target slug already in use: ${slug}`);
+        // ARCHITECT NOTE: Strict Dual-Uniqueness Protocol (Excluding Self)
+        logger.info(context, 'Step 3: Scanning ledger for collision with other nodes...');
+        const checkCollisionQuery = `SELECT slug, name FROM events WHERE (slug = $1 OR name ILIKE $2) AND id != $3;`;
+        const collisionResult = await db.query(checkCollisionQuery, [slug, name, eventId]);
+        
+        if (collisionResult.rowCount > 0) {
+            const collision = collisionResult.rows[0];
+            if (collision.slug === slug) {
+                logger.warn(context, 'Failure Point EV-Update: Slug collision detected with another node.');
                 return res.status(409).json({ success: false, message: 'The requested URL slug is already in use by another event.' });
+            }
+            if (collision.name.toLowerCase() === name.toLowerCase()) {
+                logger.warn(context, 'Failure Point EV-Update: Name collision detected with another node.');
+                return res.status(409).json({ success: false, message: 'The requested Event Name is already in use by another event.' });
             }
         }
 
+        logger.info(context, 'Step 4: Collision check passed. Committing updates...');
         const updateQuery = `
             UPDATE events 
-            SET name = $1, slug = $2, description = $3, event_date = $4, location = $5, is_public = $6
-            WHERE id = $7
+            SET name = $1, slug = $2, description = $3, start_date = $4, end_date = $5, location = $6, is_public = $7
+            WHERE id = $8
             RETURNING id, name, slug, is_public;
         `;
         
         const publicFlag = isPublic !== undefined ? isPublic : true;
-        const values = [name, slug, description, eventDate, location, publicFlag, eventId];
+        const safeStartDate = startDate ? startDate : null;
+        const safeEndDate = endDate ? endDate : null;
+
+        const values = [name, slug, description, safeStartDate, safeEndDate, location, publicFlag, eventId];
 
         const result = await db.query(updateQuery, values);
         const updatedEvent = result.rows[0];
 
-        logger.info(context, `Successfully updated event: ${updatedEvent.slug} (ID: ${updatedEvent.id})`);
+        logger.info(context, `Step 5: Successfully updated tenant: ${updatedEvent.slug}`);
 
         res.status(200).json({
             success: true,
@@ -176,8 +201,34 @@ const updateEvent = async (req, res) => {
         });
 
     } catch (error) {
-        logger.error(context, `Failure Point EV10: CRITICAL FAILURE updating event ${currentSlug}.`, error);
+        logger.error(context, `Failure Point EV10: CRITICAL FAILURE updating tenant ${currentSlug}.`, error);
         res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+const deleteEvent = async (req, res) => {
+    const context = 'EventController - deleteEvent';
+    const { eventSlug } = req.params;
+    logger.info(context, `Step 1: Admin initiated purge protocol for tenant: ${eventSlug}`);
+
+    try {
+        const deleteQuery = `DELETE FROM events WHERE slug = $1 RETURNING id, name;`;
+        const result = await db.query(deleteQuery, [eventSlug]);
+
+        if (result.rowCount === 0) {
+            logger.warn(context, `Failure Point EV12: Cannot delete, event not found: ${eventSlug}`);
+            return res.status(404).json({ success: false, message: 'Event not found.' });
+        }
+
+        logger.info(context, `Step 2: Tenant ${result.rows[0].name} and all cascading data successfully obliterated.`);
+        res.status(200).json({ 
+            success: true, 
+            message: 'Tenant environment has been securely purged.' 
+        });
+
+    } catch (error) {
+        logger.error(context, `Failure Point EV13: CRITICAL FAILURE during deletion of ${eventSlug}.`, error);
+        res.status(500).json({ success: false, message: 'Internal server error during deletion cascade.' });
     }
 };
 
@@ -186,5 +237,6 @@ module.exports = {
     getAllAdminEvents,
     getEventBySlug,
     createEvent,
-    updateEvent
+    updateEvent,
+    deleteEvent
 };
