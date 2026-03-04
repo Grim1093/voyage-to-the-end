@@ -4,7 +4,10 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { motion } from 'framer-motion';
 import { fetchEventDetails } from '../../services/api';
+import { InteractiveAura } from '@/components/ui/interactive-aura';
+import { AmbientAurora } from '@/components/ui/ambient-aurora';
 
 // ARCHITECT NOTE: Dynamically importing the EncryptedText component to prevent hydration mismatches
 const EncryptedText = dynamic(
@@ -38,7 +41,6 @@ export default function EventHub() {
         if (eventSlug) loadEvent();
     }, [eventSlug, context]);
 
-    // ARCHITECT NOTE: Date formatting utility to handle the new start and end timestamps
     const formatEventTime = (start, end) => {
         if (!start && !end) return null;
         
@@ -53,8 +55,9 @@ export default function EventHub() {
 
     if (loading) {
         return (
-            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 text-zinc-500">
-                <svg className="animate-spin h-6 w-6 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 text-zinc-500 relative overflow-hidden">
+                <AmbientAurora />
+                <svg className="animate-spin h-6 w-6 mb-4 relative z-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -64,8 +67,9 @@ export default function EventHub() {
 
     if (error || !event) {
         return (
-            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4">
-                <div className="bg-white/[0.02] border border-white/[0.05] rounded-[32px] p-8 max-w-sm text-center backdrop-blur-xl">
+            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                <AmbientAurora />
+                <div className="bg-white/[0.02] border border-white/[0.05] rounded-[32px] p-8 max-w-sm text-center backdrop-blur-xl relative z-10">
                     <h1 className="text-lg font-medium text-zinc-200 mb-2">Access Denied</h1>
                     <p className="text-zinc-500 text-xs mb-6">{error}</p>
                     <Link href="/" className="inline-flex py-2 px-4 bg-white text-black rounded-full text-xs font-bold transition-all hover:bg-zinc-200">
@@ -82,7 +86,8 @@ export default function EventHub() {
     if (event.is_expired) {
         return (
             <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 relative overflow-hidden">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-500/[0.02] rounded-full filter blur-[150px] pointer-events-none"></div>
+                <AmbientAurora />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-500/[0.03] rounded-full filter blur-[150px] pointer-events-none z-0"></div>
                 
                 <div className="bg-white/[0.02] border border-white/[0.05] rounded-[40px] p-12 max-w-md text-center backdrop-blur-2xl z-10 shadow-2xl">
                     <div className="w-16 h-16 bg-white/[0.03] rounded-full flex items-center justify-center mx-auto mb-6 border border-white/[0.08]">
@@ -100,13 +105,23 @@ export default function EventHub() {
         );
     }
 
+    // Orchestration Configuration
+    const staggerContainer = {
+        hidden: { opacity: 0 },
+        show: { opacity: 1, transition: { staggerChildren: 0.15 } }
+    };
+
+    const itemVariant = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    };
+
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
 
-            <div className="absolute inset-0 pointer-events-none z-0 flex justify-center">
-                <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-white/[0.02] rounded-full filter blur-[150px]"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-indigo-500/[0.03] rounded-full filter blur-[120px]" style={{ animationDelay: '2s' }}></div>
-            </div>
+            {/* Global Mesh Background & Cursor Aura */}
+            <AmbientAurora />
+            <InteractiveAura />
 
             <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20">
                 <div className="flex items-center gap-3">
@@ -122,10 +137,14 @@ export default function EventHub() {
                 </Link>
             </header>
 
-            <div className="max-w-4xl w-full z-10 flex flex-col items-center pb-12 pt-16 px-4">
+            <motion.div 
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="max-w-4xl w-full z-10 flex flex-col items-center pb-12 pt-16 px-4"
+            >
 
-                <div className="text-center mb-16 space-y-4">
-                    {/* ARCHITECT NOTE: Theme re-calibration to match the monochromatic desaturated aesthetic */}
+                <motion.div variants={itemVariant} className="text-center mb-16 space-y-4">
                     <div className="inline-flex items-center gap-2 mb-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-300 text-[10px] font-bold tracking-[0.15em] uppercase shadow-inner">
                         <span className="w-1.5 h-1.5 rounded-full bg-white/[0.4] animate-pulse"></span>
                         Active Tenant Portal
@@ -142,53 +161,67 @@ export default function EventHub() {
                         {event.desc || `Accessing dynamic data for the ${event.title} node.`}
                     </p>
                     
-                    {/* ARCHITECT NOTE: The Repaired Chronology Display */}
                     {(formattedDate || event.location) && (
                         <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] text-zinc-400 mt-6 font-medium uppercase tracking-widest">
                             {formattedDate && (
-                                <span className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] rounded-full border border-white/[0.05] shadow-inner">
+                                <span className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] rounded-full border border-white/[0.05] shadow-inner backdrop-blur-md">
                                     <svg className="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     {formattedDate}
                                 </span>
                             )}
                             {event.location && (
-                                <span className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] rounded-full border border-white/[0.05] shadow-inner">
+                                <span className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] rounded-full border border-white/[0.05] shadow-inner backdrop-blur-md">
                                     <svg className="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     {event.location}
                                 </span>
                             )}
                         </div>
                     )}
-                </div>
+                </motion.div>
 
                 {/* Free-Floating Navigation Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
-                    <div className="bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group">
-                        <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center mb-6 border border-white/[0.08]">
-                            <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
-                        </div>
-                        <h2 className="text-xl font-medium text-zinc-100 mb-3 tracking-tight">Register</h2>
-                        <p className="text-zinc-500 text-xs mb-8 flex-grow leading-relaxed">Secure your clearance for this event. Submit your identity document for ledger verification.</p>
-                        <Link href={`/${eventSlug}/register`} className="w-full py-2.5 px-4 bg-white text-black rounded-full font-bold text-[11px] uppercase tracking-wider transition-all hover:bg-zinc-200">
-                            Start Registration
-                        </Link>
-                    </div>
+                    
+                    {/* Node 1: Register (Violet/Fuchsia Holographic) */}
+                    <motion.div variants={itemVariant}>
+                        <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(139,92,246,0.15)]">
+                            {/* Holographic Beam */}
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-violet-400/20 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" />
+                            {/* Ambient Pulse Aura */}
+                            <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '5s' }} />
 
-                    <div className="bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] group">
-                        <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center mb-6 border border-white/[0.08]">
-                            <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center mb-6 border border-white/[0.08] relative z-10">
+                                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                            </div>
+                            <h2 className="text-xl font-medium text-zinc-100 mb-3 tracking-tight relative z-10">Register</h2>
+                            <p className="text-zinc-500 text-xs mb-8 flex-grow leading-relaxed relative z-10">Secure your clearance for this event. Submit your identity document for ledger verification.</p>
+                            <Link href={`/${eventSlug}/register`} className="w-full py-2.5 px-4 bg-white text-black rounded-full font-bold text-[11px] uppercase tracking-wider transition-all hover:bg-zinc-200 relative z-10 shadow-lg shadow-white/5">
+                                Start Registration
+                            </Link>
                         </div>
-                        <h2 className="text-xl font-medium text-zinc-100 mb-3 tracking-tight">Portal</h2>
-                        <p className="text-zinc-500 text-xs mb-8 flex-grow leading-relaxed">Already committed to the ledger? View your live verification state and event dashboard.</p>
-                        <Link href={`/${eventSlug}/portal`} className="w-full py-2.5 px-4 bg-white/[0.03] hover:bg-white/[0.1] border border-white/[0.05] rounded-full font-bold text-[11px] uppercase tracking-wider transition-all text-zinc-200 hover:text-white">
-                            Enter Portal
-                        </Link>
-                    </div>
+                    </motion.div>
+
+                    {/* Node 2: Portal (Blue/Cyan Holographic) */}
+                    <motion.div variants={itemVariant}>
+                        <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)]">
+                            {/* Holographic Beam */}
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-blue-400/20 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" />
+                            {/* Ambient Pulse Aura */}
+                            <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '6s' }} />
+
+                            <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center mb-6 border border-white/[0.08] relative z-10">
+                                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                            </div>
+                            <h2 className="text-xl font-medium text-zinc-100 mb-3 tracking-tight relative z-10">Portal</h2>
+                            <p className="text-zinc-500 text-xs mb-8 flex-grow leading-relaxed relative z-10">Already committed to the ledger? View your live verification state and event dashboard.</p>
+                            <Link href={`/${eventSlug}/portal`} className="w-full py-2.5 px-4 bg-white/[0.03] hover:bg-white/[0.1] border border-white/[0.05] rounded-full font-bold text-[11px] uppercase tracking-wider transition-all text-zinc-200 hover:text-white relative z-10">
+                                Enter Portal
+                            </Link>
+                        </div>
+                    </motion.div>
+
                 </div>
-
-                
-
-            </div>
+            </motion.div>
         </main>
     );
 }
