@@ -19,9 +19,11 @@ export default function NewEventDeployment() {
         endDate: '',
         location: '',
         description: '',
-        isPublic: true
+        isPublic: true,
+        images: [] 
     });
 
+    const [currentImageUrl, setCurrentImageUrl] = useState('');
     const [status, setStatus] = useState('idle'); 
     const [message, setMessage] = useState('');
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
@@ -67,6 +69,29 @@ export default function NewEventDeployment() {
         });
     };
 
+    const handleAddImage = (e) => {
+        e.preventDefault();
+        if (!currentImageUrl.trim()) return;
+        
+        if (!currentImageUrl.startsWith('http')) {
+            alert('Please enter a valid hosted image URL starting with http:// or https://');
+            return;
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, currentImageUrl.trim()]
+        }));
+        setCurrentImageUrl('');
+    };
+
+    const handleRemoveImage = (indexToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, index) => index !== indexToRemove)
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         console.log(`${context} Step 1: Committing new tenant deployment...`, formData);
@@ -87,8 +112,6 @@ export default function NewEventDeployment() {
 
         setStatus('loading');
         try {
-            // ARCHITECT NOTE: The Timezone Lock
-            // We convert the raw local browser string into a globally aware UTC ISO String
             console.log(`${context} Step 1.5: Applying timezone locks to payload...`);
             const payload = {
                 ...formData,
@@ -107,7 +130,6 @@ export default function NewEventDeployment() {
         }
     };
 
-    // ARCHITECTURE: Staggered Deployment Configuration
     const staggerContainer = {
         hidden: { opacity: 0 },
         show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -126,7 +148,6 @@ export default function NewEventDeployment() {
                     animate={{ scale: 1, opacity: 1 }}
                     className="bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[40px] p-12 max-w-lg text-center shadow-2xl z-10 relative overflow-hidden group"
                 >
-                    {/* Admin Holographic Success Sweep */}
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-emerald-400/10 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
                     
                     <div className="relative z-10">
@@ -141,7 +162,7 @@ export default function NewEventDeployment() {
                             <Link href={`/${formData.slug}`} className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
                                 Visit Hub Node
                             </Link>
-                            <Link href="/admin/dashboard" className="w-full py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-xs uppercase tracking-widest transition-all">
+                            <Link href="/admin" className="w-full py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-xs uppercase tracking-widest transition-all">
                                 Control Plane
                             </Link>
                         </div>
@@ -177,7 +198,6 @@ export default function NewEventDeployment() {
             >
                 <motion.div variants={itemVariant} className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl relative group transition-all duration-500 hover:shadow-[0_0_30px_rgba(34,211,238,0.05)]">
                     
-                    {/* Admin Holographic Cyan Sweep for Forms */}
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
                     <form onSubmit={handleSubmit} className="p-10 space-y-10 relative z-10">
@@ -267,6 +287,74 @@ export default function NewEventDeployment() {
                                 />
                             </div>
 
+                            {/* ARCHITECTURE: The Image Node Injector */}
+                            <div className="space-y-4 pt-4 border-t border-white/[0.03]">
+                                <div className="flex justify-between items-end ml-2 mb-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Atmospheric Images</label>
+                                </div>
+
+                                {/* ARCHITECTURE: The Landscape Orientation Warning */}
+                                <div className="flex items-start gap-3 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 shadow-[inset_0_0_20px_rgba(245,158,11,0.02)]">
+                                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-widest mb-1">Orientation Protocol</h4>
+                                        <p className="text-[11px] text-amber-500/80 leading-relaxed font-mono">
+                                            The Hero Engine strictly requires <span className="text-amber-400 font-bold">Landscape (16:9)</span> images. Uploading Vertical/Portrait images will cause severe cropping and visual degradation across the global network.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <input 
+                                        type="url" 
+                                        value={currentImageUrl}
+                                        onChange={(e) => setCurrentImageUrl(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddImage(e)}
+                                        placeholder="https://hosted-image-url.com/node.jpg"
+                                        className="flex-1 bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={handleAddImage}
+                                        disabled={!currentImageUrl.trim()}
+                                        className="px-6 rounded-full bg-white/[0.05] hover:bg-cyan-500/20 border border-white/[0.05] hover:border-cyan-500/30 text-zinc-300 hover:text-cyan-400 font-bold text-[10px] uppercase tracking-widest transition-all disabled:opacity-30"
+                                    >
+                                        Attach
+                                    </button>
+                                </div>
+                                
+                                {/* The Array Visualizer */}
+                                {formData.images.length > 0 && (
+                                    <div className="flex gap-4 overflow-x-auto pb-4 pt-2 custom-scrollbar">
+                                        <AnimatePresence>
+                                            {formData.images.map((url, index) => (
+                                                <motion.div 
+                                                    key={`${url}-${index}`}
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/[0.1] group/img" // Adjusted to 16:9 ratio box
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={url} alt="Attached Node" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRemoveImage(index)}
+                                                            className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="pt-6 border-t border-white/[0.03]">
                                 <label className="flex items-center cursor-pointer group">
                                     <div className="relative">
@@ -290,7 +378,7 @@ export default function NewEventDeployment() {
 
                         <div className="pt-8 border-t border-white/[0.03] flex justify-end gap-4 items-center">
                             <Link 
-                                href="/admin/dashboard"
+                                href="/admin"
                                 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] hover:text-white transition-colors"
                             >
                                 Discard Node
