@@ -6,12 +6,17 @@ const getPublicEvents = async (req, res) => {
     logger.info(context, 'Fetching all public, active events for Global Hub.');
 
     try {
+        // ARCHITECT NOTE: Injected JSON aggregation to fetch related images as a clean array
         const query = `
-            SELECT slug, name as title, start_date, end_date, description as desc, location 
-            FROM events 
-            WHERE is_public = TRUE 
-            AND (end_date IS NULL OR end_date > CURRENT_TIMESTAMP)
-            ORDER BY created_at DESC;
+            SELECT e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location,
+                   COALESCE(
+                       (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
+                        FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
+                   ) as images
+            FROM events e
+            WHERE e.is_public = TRUE 
+            AND (e.end_date IS NULL OR e.end_date > CURRENT_TIMESTAMP)
+            ORDER BY e.created_at DESC;
         `;
         const result = await db.query(query);
 
@@ -31,10 +36,14 @@ const getAllAdminEvents = async (req, res) => {
 
     try {
         const query = `
-            SELECT id, slug, name as title, start_date, end_date, description as desc, location, is_public,
-                   (end_date IS NOT NULL AND end_date < CURRENT_TIMESTAMP) as is_expired
-            FROM events 
-            ORDER BY created_at DESC;
+            SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
+                   (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
+                   COALESCE(
+                       (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
+                        FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
+                   ) as images
+            FROM events e
+            ORDER BY e.created_at DESC;
         `;
         const result = await db.query(query);
 
@@ -55,10 +64,14 @@ const getEventBySlug = async (req, res) => {
 
     try {
         const query = `
-            SELECT slug, name as title, start_date, end_date, description as desc, location, is_public,
-                   (end_date IS NOT NULL AND end_date < CURRENT_TIMESTAMP) as is_expired
-            FROM events 
-            WHERE slug = $1;
+            SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
+                   (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
+                   COALESCE(
+                       (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
+                        FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
+                   ) as images
+            FROM events e
+            WHERE e.slug = $1;
         `;
         const result = await db.query(query, [eventSlug]);
 
@@ -82,13 +95,12 @@ const createEvent = async (req, res) => {
     logger.info(context, 'Step 1: Admin attempting to deploy a new tenant.');
 
     try {
-        const { name, slug, description, startDate, endDate, location, isPublic } = req.body;
+        const { name, slug, description, startDate, endDate, location, isPublic, images } = req.body;
 
         if (!name || !slug) {
             return res.status(400).json({ success: false, message: 'Event Name and Slug are required.' });
         }
 
-        // ARCHITECT NOTE: Strict Dual-Uniqueness Protocol (Case-Insensitive)
         logger.info(context, 'Step 2: Scanning ledger for Name or Slug collisions...');
         const checkQuery = `SELECT slug, name FROM events WHERE slug = $1 OR name ILIKE $2;`;
         const checkResult = await db.query(checkQuery, [slug, name]);
@@ -117,9 +129,23 @@ const createEvent = async (req, res) => {
         const safeEndDate = endDate ? endDate : null;
 
         const values = [name, slug, description, safeStartDate, safeEndDate, location, publicFlag];
-
         const result = await db.query(insertQuery, values);
         const newEvent = result.rows[0];
+
+        // ARCHITECT NOTE: Image Provisioning
+        if (images && Array.isArray(images) && images.length > 0) {
+            logger.info(context, `Step 3.5: Provisioning ${images.length} images for tenant...`);
+            const insertPromises = images.map((url, idx) => {
+                return db.query(
+                    `INSERT INTO event_images (event_id, image_url, display_order) VALUES ($1, $2, $3)`,
+                    [newEvent.id, url, idx]
+                );
+            });
+            await Promise.all(insertPromises);
+            newEvent.images = images;
+        } else {
+            newEvent.images = [];
+        }
 
         logger.info(context, `Step 4: Successfully deployed new tenant: ${newEvent.slug}`);
 
@@ -141,7 +167,7 @@ const updateEvent = async (req, res) => {
     logger.info(context, `Step 1: Admin attempting to update tenant: ${currentSlug}`);
 
     try {
-        const { name, slug, description, startDate, endDate, location, isPublic } = req.body;
+        const { name, slug, description, startDate, endDate, location, isPublic, images } = req.body;
 
         if (!name || !slug) {
             return res.status(400).json({ success: false, message: 'Event Name and Slug are required.' });
@@ -158,7 +184,6 @@ const updateEvent = async (req, res) => {
 
         const eventId = existResult.rows[0].id;
 
-        // ARCHITECT NOTE: Strict Dual-Uniqueness Protocol (Excluding Self)
         logger.info(context, 'Step 3: Scanning ledger for collision with other nodes...');
         const checkCollisionQuery = `SELECT slug, name FROM events WHERE (slug = $1 OR name ILIKE $2) AND id != $3;`;
         const collisionResult = await db.query(checkCollisionQuery, [slug, name, eventId]);
@@ -192,6 +217,25 @@ const updateEvent = async (req, res) => {
         const result = await db.query(updateQuery, values);
         const updatedEvent = result.rows[0];
 
+        // ARCHITECT NOTE: Image Synchronization (Wipe and Rewrite Strategy)
+        if (images && Array.isArray(images)) {
+            logger.info(context, `Step 4.5: Synchronizing image node architecture...`);
+            // Purge existing images attached to this event
+            await db.query(`DELETE FROM event_images WHERE event_id = $1`, [eventId]);
+            
+            // Re-insert the new payload to guarantee correct ordering
+            if (images.length > 0) {
+                const insertPromises = images.map((url, idx) => {
+                    return db.query(
+                        `INSERT INTO event_images (event_id, image_url, display_order) VALUES ($1, $2, $3)`,
+                        [eventId, url, idx]
+                    );
+                });
+                await Promise.all(insertPromises);
+            }
+            updatedEvent.images = images;
+        }
+
         logger.info(context, `Step 5: Successfully updated tenant: ${updatedEvent.slug}`);
 
         res.status(200).json({
@@ -212,6 +256,8 @@ const deleteEvent = async (req, res) => {
     logger.info(context, `Step 1: Admin initiated purge protocol for tenant: ${eventSlug}`);
 
     try {
+        // Because of the ON DELETE CASCADE constraint in PostgreSQL, 
+        // deleting the event automatically purges the linked event_images records.
         const deleteQuery = `DELETE FROM events WHERE slug = $1 RETURNING id, name;`;
         const result = await db.query(deleteQuery, [eventSlug]);
 

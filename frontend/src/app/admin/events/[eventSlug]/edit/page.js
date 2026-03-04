@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import { fetchEventDetails, updateEventDetails, deleteEvent } from '../../../../../services/api';
+import { AmbientAurora } from '@/components/ui/ambient-aurora';
+import { InteractiveAura } from '@/components/ui/interactive-aura';
 
 export default function EditEventDeployment() {
     const params = useParams();
@@ -18,9 +21,11 @@ export default function EditEventDeployment() {
         endDate: '',
         location: '',
         description: '',
-        isPublic: true
+        isPublic: true,
+        images: [] 
     });
 
+    const [currentImageUrl, setCurrentImageUrl] = useState('');
     const [status, setStatus] = useState('loading'); 
     const [message, setMessage] = useState('');
     const [newSlug, setNewSlug] = useState('');
@@ -41,13 +46,9 @@ export default function EditEventDeployment() {
             try {
                 const data = await fetchEventDetails(currentEventSlug);
                 
-                // ARCHITECT NOTE: Timezone formatting for the native input
-                // We must strip the 'Z' from the ISO string to prevent the browser 
-                // from attempting to shift the time when populating the input field
                 const formatForInput = (isoString) => {
                     if (!isoString) return '';
                     const date = new Date(isoString);
-                    // Manually construct the local YYYY-MM-DDThh:mm format to bypass timezone shifts
                     const tzOffset = date.getTimezoneOffset() * 60000;
                     return (new Date(date - tzOffset)).toISOString().slice(0, 16);
                 };
@@ -59,7 +60,8 @@ export default function EditEventDeployment() {
                     endDate: formatForInput(data.end_date),
                     location: data.location || '',
                     description: data.desc || '',
-                    isPublic: data.is_public !== undefined ? data.is_public : true
+                    isPublic: data.is_public !== undefined ? data.is_public : true,
+                    images: data.images || [] 
                 });
                 setStatus('idle');
             } catch (error) {
@@ -87,6 +89,29 @@ export default function EditEventDeployment() {
         setFormData({ ...formData, slug: safeSlug });
     };
 
+    const handleAddImage = (e) => {
+        e.preventDefault();
+        if (!currentImageUrl.trim()) return;
+        
+        if (!currentImageUrl.startsWith('http')) {
+            alert('Please enter a valid hosted image URL starting with http:// or https://');
+            return;
+        }
+
+        setFormData(prev => ({
+            ...prev,
+            images: [...prev.images, currentImageUrl.trim()]
+        }));
+        setCurrentImageUrl('');
+    };
+
+    const handleRemoveImage = (indexToRemove) => {
+        setFormData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, index) => index !== indexToRemove)
+        }));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -106,8 +131,6 @@ export default function EditEventDeployment() {
 
         setStatus('submitting');
         try {
-            // ARCHITECT NOTE: The Outgoing Timezone Lock
-            // Re-wrapping the local browser time into an immutable UTC ISO string
             const payload = {
                 ...formData,
                 startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
@@ -141,10 +164,20 @@ export default function EditEventDeployment() {
         }
     };
 
+    const staggerContainer = {
+        hidden: { opacity: 0 },
+        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    };
+    const itemVariant = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    };
+
     if (status === 'loading') {
         return (
-            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 text-zinc-500">
-                <svg className="animate-spin h-6 w-6 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 text-zinc-500 relative overflow-hidden">
+                <AmbientAurora />
+                <svg className="animate-spin h-6 w-6 mb-4 relative z-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -154,30 +187,43 @@ export default function EditEventDeployment() {
 
     if (status === 'success') {
         return (
-            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-6 text-zinc-200 relative">
-                <div className="bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[40px] p-12 max-w-lg text-center shadow-2xl z-10">
-                    <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/20">
-                        <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-6 text-zinc-200 relative overflow-hidden">
+                <AmbientAurora />
+                <motion.div 
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[40px] p-12 max-w-lg text-center shadow-2xl z-10 relative overflow-hidden group"
+                >
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-emerald-400/10 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
+                    
+                    <div className="relative z-10">
+                        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/20">
+                            <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        <h1 className="text-3xl font-medium text-white mb-4">Node Updated</h1>
+                        <p className="text-zinc-500 mb-10 leading-relaxed text-sm tracking-wide">
+                            {message} The environment changes have been committed to the global network.
+                        </p>
+                        <div className="flex flex-col gap-4">
+                            <Link href={`/${newSlug}`} target="_blank" className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
+                                View Live Hub
+                            </Link>
+                            <Link href="/admin" className="w-full py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-xs uppercase tracking-widest transition-all">
+                                Control Plane
+                            </Link>
+                        </div>
                     </div>
-                    <h1 className="text-3xl font-medium text-white mb-4">Node Updated</h1>
-                    <p className="text-zinc-500 mb-10 leading-relaxed text-sm tracking-wide">
-                        {message} The environment changes have been committed to the global network.
-                    </p>
-                    <div className="flex flex-col gap-4">
-                        <Link href={`/${newSlug}`} target="_blank" className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
-                            View Live Hub
-                        </Link>
-                        <Link href="/admin" className="w-full py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-xs uppercase tracking-widest transition-all">
-                            Control Plane
-                        </Link>
-                    </div>
-                </div>
+                </motion.div>
             </main>
         );
     }
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
+            
+            <AmbientAurora />
+            <InteractiveAura />
+
             <header className="w-full max-w-7xl flex items-center justify-between px-6 py-5 z-20">
                 <div className="flex items-center gap-4">
                     <Link href="/admin" className="w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.1] transition-all">
@@ -185,14 +231,22 @@ export default function EditEventDeployment() {
                     </Link>
                     <div>
                         <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Edit Configuration</h1>
-                        <p className="text-[9px] text-zinc-500 font-mono tracking-widest uppercase">Target: /{currentEventSlug}</p>
+                        <p className="text-[9px] text-cyan-400 font-mono tracking-widest uppercase">Target: /{currentEventSlug}</p>
                     </div>
                 </div>
             </header>
 
-            <div className="max-w-2xl w-full z-10 relative px-6 pb-16 pt-8">
-                <div className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl">
-                    <form onSubmit={handleSubmit} className="p-10 space-y-10">
+            <motion.div 
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="max-w-2xl w-full z-10 relative px-6 pb-16 pt-8"
+            >
+                <motion.div variants={itemVariant} className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl relative group transition-all duration-500 hover:shadow-[0_0_30px_rgba(34,211,238,0.05)]">
+                    
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+
+                    <form onSubmit={handleSubmit} className="p-10 space-y-10 relative z-10">
                         {status === 'error' && (
                             <div className="p-4 bg-rose-500/5 border border-rose-500/10 text-rose-400/80 text-xs font-medium rounded-2xl tracking-wide">
                                 {message}
@@ -208,13 +262,13 @@ export default function EditEventDeployment() {
                                     value={formData.name}
                                     onChange={handleChange}
                                     required
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                 />
                             </div>
 
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">URL Slug</label>
-                                <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500/50 transition-all shadow-inner">
+                                <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/30 transition-all shadow-inner">
                                     <span className="flex items-center pl-6 pr-2 text-zinc-600 text-[10px] font-mono uppercase tracking-tight">
                                         node/
                                     </span>
@@ -238,7 +292,7 @@ export default function EditEventDeployment() {
                                         name="startDate"
                                         value={formData.startDate}
                                         onChange={handleChange}
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm shadow-inner [color-scheme:dark]"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner [color-scheme:dark]"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -248,7 +302,7 @@ export default function EditEventDeployment() {
                                         name="endDate"
                                         value={formData.endDate}
                                         onChange={handleChange}
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm shadow-inner [color-scheme:dark]"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner [color-scheme:dark]"
                                     />
                                 </div>
                             </div>
@@ -260,7 +314,7 @@ export default function EditEventDeployment() {
                                     name="location"
                                     value={formData.location}
                                     onChange={handleChange}
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm shadow-inner"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner"
                                 />
                             </div>
 
@@ -271,8 +325,76 @@ export default function EditEventDeployment() {
                                     value={formData.description}
                                     onChange={handleChange}
                                     rows="3"
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 transition-all text-sm resize-none shadow-inner"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm resize-none shadow-inner"
                                 />
+                            </div>
+
+                            {/* ARCHITECTURE: The Image Node Injector */}
+                            <div className="space-y-4 pt-4 border-t border-white/[0.03]">
+                                <div className="flex justify-between items-end ml-2 mb-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Atmospheric Images</label>
+                                </div>
+
+                                {/* ARCHITECTURE: The Landscape Orientation Warning */}
+                                <div className="flex items-start gap-3 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 shadow-[inset_0_0_20px_rgba(245,158,11,0.02)]">
+                                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-widest mb-1">Orientation Protocol</h4>
+                                        <p className="text-[11px] text-amber-500/80 leading-relaxed font-mono">
+                                            The Hero Engine strictly requires <span className="text-amber-400 font-bold">Landscape (16:9)</span> images. Uploading Vertical/Portrait images will cause severe cropping and visual degradation across the global network.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <input 
+                                        type="url" 
+                                        value={currentImageUrl}
+                                        onChange={(e) => setCurrentImageUrl(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddImage(e)}
+                                        placeholder="https://hosted-image-url.com/node.jpg"
+                                        className="flex-1 bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={handleAddImage}
+                                        disabled={!currentImageUrl.trim()}
+                                        className="px-6 rounded-full bg-white/[0.05] hover:bg-cyan-500/20 border border-white/[0.05] hover:border-cyan-500/30 text-zinc-300 hover:text-cyan-400 font-bold text-[10px] uppercase tracking-widest transition-all disabled:opacity-30"
+                                    >
+                                        Attach
+                                    </button>
+                                </div>
+                                
+                                {/* The Array Visualizer */}
+                                {formData.images.length > 0 && (
+                                    <div className="flex gap-4 overflow-x-auto pb-4 pt-2 custom-scrollbar">
+                                        <AnimatePresence>
+                                            {formData.images.map((url, index) => (
+                                                <motion.div 
+                                                    key={`${url}-${index}`}
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/[0.1] group/img" // 16:9 ratio
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={url} alt="Attached Node" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRemoveImage(index)}
+                                                            className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="pt-6 border-t border-white/[0.03]">
@@ -285,7 +407,7 @@ export default function EditEventDeployment() {
                                             onChange={handleChange}
                                             className="sr-only" 
                                         />
-                                        <div className={`w-11 h-6 rounded-full transition-all duration-300 ${formData.isPublic ? 'bg-indigo-500/40' : 'bg-white/[0.05]'}`}></div>
+                                        <div className={`w-11 h-6 rounded-full transition-all duration-300 ${formData.isPublic ? 'bg-cyan-500/40' : 'bg-white/[0.05]'}`}></div>
                                         <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${formData.isPublic ? 'translate-x-5' : ''}`}></div>
                                     </div>
                                     <div className="ml-4">
@@ -328,8 +450,8 @@ export default function EditEventDeployment() {
                             </div>
                         </div>
                     </form>
-                </div>
-            </div>
+                </motion.div>
+            </motion.div>
         </main>
     );
 }
