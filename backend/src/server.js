@@ -2,66 +2,94 @@ require('dotenv').config();
 const express = require('express');
 const { connectDB } = require('./config/db');
 const cors = require('cors');
-const logger = require('./utils/logger');
+const logger = require('./utils/logger'); // Assuming this is your custom winston/pino logger
+
+console.log('[ServerBoot] Step 1: Initiating Master Control Plane boot sequence...');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- SECURITY MIDDLEWARE ---
-// Step 1: Configure CORS to strictly allow our Next.js frontend
+console.log('[Security] Step 2: Configuring Dynamic CORS Origin Gateway...');
+
+// ARCHITECT NOTE: Static origins for Local Dev and Master Production URL
+const staticAllowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    process.env.FRONTEND_URL 
+].filter(Boolean);
+
 const corsOptions = {
-    // ARCHITECT NOTE: Upgraded to look for a production environment variable first!
-    origin: process.env.FRONTEND_URL || 'http://localhost:3001', 
-    // ARCHITECT NOTE: The Bouncer is now instructed to allow DELETE protocols
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'], 
-    allowedHeaders: ['Content-Type', 'x-admin-key'], 
+    origin: function (origin, callback) {
+        // Condition 1: Allow server-to-server or non-browser requests (no origin)
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        // Condition 2: Exact string match against our static whitelist
+        if (staticAllowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        // Condition 3: Dynamic RegEx match for Vercel Preview Deployments
+        // This regex ensures it strictly starts with https://voyage-to-the-end and ends with .vercel.app
+        const isVercelPreview = /^https:\/\/voyage-to-the-end.*\.vercel\.app$/.test(origin);
+
+        if (isVercelPreview) {
+            console.log(`[Security] Step 2.1: Authorized dynamic Vercel preview branch: ${origin}`);
+            return callback(null, true);
+        }
+
+        // Condition 4: Total Rejection
+        console.error(`[Security] Failure Point A: Blocked unauthorized CORS request. Origin not in whitelist or preview pattern: ${origin}`);
+        callback(new Error('Origin completely unauthorized by CORS Bouncer.'));
+    },
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-admin-key', 'Authorization'], 
+    credentials: true 
 };
 
-// Apply the CORS barrier
 app.use(cors(corsOptions));
-logger.info('ServerBoot', `CORS middleware configured. Allowed origin: ${process.env.FRONTEND_URL || 'http://localhost:3001'}`);
+console.log(`[Security] Step 3: CORS gateway engaged. Static Whitelist configured + Vercel Preview RegEx active.`);
 
-// Middleware: This allows our server to read JSON data sent from the frontend forms
 app.use(express.json());
-logger.info('ServerBoot', 'Step 1: JSON body parser engaged.');
+console.log('[ServerBoot] Step 4: JSON body parser active.');
 
-// Mount the Routers (Wiring the Brain to the URL)
-const guestRoutes = require('./routes/guestRoutes');
-app.use('/api/guests', guestRoutes);
-logger.info('ServerBoot', 'Step 2: Mounted guest node routing at /api/guests');
+// --- ROUTER MOUNTING ---
+try {
+    const guestRoutes = require('./routes/guestRoutes');
+    app.use('/api/guests', guestRoutes);
+    console.log('[Router] Step 5: Guest Node routing mounted at /api/guests');
 
-// Mounting our new Event Management Engine
-const eventRoutes = require('./routes/eventRoutes');
-app.use('/api/events', eventRoutes);
-logger.info('ServerBoot', 'Step 3: Mounted master event routing at /api/events');
+    const eventRoutes = require('./routes/eventRoutes');
+    app.use('/api/events', eventRoutes);
+    console.log('[Router] Step 6: Master Event routing mounted at /api/events');
+} catch (error) {
+    console.error('[Router] Failure Point B: Failed to mount routing modules.', error);
+    process.exit(1);
+}
 
-// Failure Point / DevOps Check: A simple route to verify the server is running
+// --- TELEMETRY & HEALTH ---
 app.get('/health', (req, res) => {
-    logger.info('ServerHealth', 'Uptime health check endpoint pinged.');
-    res.status(200).json({ status: 'OK', message: 'MICE Guest Ledger API is running dynamically.' });
+    console.log('[ServerHealth] Uptime check pinged from external source.');
+    res.status(200).json({ status: 'OK', message: 'MICE Node API is operational.' });
 });
 
-// Boot Sequence
+// --- IGNITION SEQUENCE ---
 const startServer = async () => {
     try {
-        logger.info('ServerBoot', 'Step 4: Initiating main ignition sequence...');
-        
-        // Connect to the Database (Our Failure Point 0)
-        // If this fails, the catch block below triggers instantly.
+        console.log('[Database] Step 7: Attempting connection to PostgreSQL Global Ledger...');
         await connectDB();
-        logger.info('ServerBoot', 'Step 5: Database uplink established.');
+        console.log('[Database] Step 8: Ledger uplink established successfully.');
         
-        // Start listening for HTTP requests
         app.listen(PORT, () => {
-            logger.info('ServerBoot', `Step 6: Ignition complete. Master Control Plane is actively listening on port ${PORT}`);
+            console.log(`[ServerBoot] Step 9: Ignition complete. Nexus Control Plane listening on port ${PORT}`);
         });
         
     } catch (error) {
-        logger.error('ServerBoot', 'CRITICAL FAILURE Point 0: Boot sequence aborted.', error);
-        // Exit the process if the server cannot boot properly
+        console.error('[Database] CRITICAL Failure Point 0: Database connection rejected. Aborting boot sequence.', error);
         process.exit(1);
     }
 };
 
-// Execute the boot sequence
 startServer();
