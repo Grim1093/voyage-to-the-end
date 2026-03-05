@@ -1,23 +1,31 @@
 const nodemailer = require('nodemailer');
-const logger = require('../utils/logger');
 
-// Step 1: Configure the Transporter (The Mail Carrier)
-// We pull credentials from the secure environment variables so they never touch the codebase.
+console.log('[EmailService] Step 0: Initializing SMTP Transporter module...');
+
+// ARCHITECT NOTE: We abandon the 'service: gmail' abstraction. 
+// We explicitly define the transport layer to penetrate cloud firewalls securely.
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // For production, you might swap this to AWS SES, SendGrid, or Mailgun
+    host: 'smtp.gmail.com',
+    port: 465, // Strictly enforce Port 465 (Secure SSL/TLS) to bypass Render's outbound restrictions
+    secure: true, // Enforce true for port 465
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_APP_PASSWORD 
+    },
+    tls: {
+        // This ensures the connection doesn't fail if the cloud provider intercepts the SSL ping
+        rejectUnauthorized: false 
     }
 });
 
 // ARCHITECT NOTE: Added eventName parameter to distinguish multi-tenant event registrations
 const sendAccessCode = async (email, fullName, accessCode, eventName) => {
-    const context = 'EmailService';
-    logger.info(context, `Step 1: Preparing to send access code for event [${eventName}] to ${email}`);
+    const context = `[EmailService - ${eventName}]`;
+    console.log(`${context} Step 1: Preparing to send access code to ${email}`);
 
     try {
-        // Step 2: Construct the email payload dynamically with the event name
+        console.log(`${context} Step 2: Constructing HTML payload for ${email}...`);
+        
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: email,
@@ -37,17 +45,17 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
             `
         };
 
-        logger.info(context, `Step 2: Payload constructed for ${email}. Attempting network dispatch...`);
+        console.log(`${context} Step 3: Payload constructed. Initiating secure network dispatch via smtp.gmail.com:465...`);
 
-        // Step 3: Send the email
+        // Step 4: Await the SMTP handshake and transmission
         const info = await transporter.sendMail(mailOptions);
         
-        logger.info(context, `Step 3: SUCCESS. Email dispatched! Message ID: ${info.messageId}`);
+        console.log(`${context} Step 4: SUCCESS. Transporter verified delivery. Message ID: ${info.messageId}`);
         return true;
 
     } catch (error) {
-        // Failure Point Y: Caught if SMTP authentication fails or network is down
-        logger.error(context, `CRITICAL FAILURE (Failure Point Y): Nodemailer failed to dispatch email to ${email}.`, error);
+        // Failure Point Y: Caught if explicit SMTP authentication fails or network is blocked
+        console.error(`${context} CRITICAL FAILURE (Failure Point Y): Nodemailer network dispatch rejected for ${email}.`, error);
         throw error; // Rethrow to let the controller handle it gracefully
     }
 };
