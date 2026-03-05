@@ -13,7 +13,7 @@ Follow these steps to initialize the backend environment and start the developme
 2. **Environment Configuration:**
    Create a `.env` file in the root of the `backend/` directory. You will need to provide the following configuration values, particularly the connection string for the Aiven-hosted PostgreSQL database:
    ```env
-   PORT=5000
+   PORT=3000
    DATABASE_URL=postgres://<username>:<password>@<host>:<port>/<database>?sslmode=require
    ```
    *Note: Ensure `sslmode=require` is appended to the `DATABASE_URL` for secure connections to Aiven.*
