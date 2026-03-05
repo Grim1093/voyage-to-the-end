@@ -1,5 +1,9 @@
+// --- SANITIZATION PIPELINE ---
 // Grab the API URL from our environment variables
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+
+// Self-healing URL parser: strips trailing slashes and ensures the /api namespace is targeted
+const API_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl.replace(/\/$/, '')}/api`;
 
 export const registerGuest = async (eventSlug, guestData) => {
     const context = `[Frontend API Service - ${eventSlug}]`;
@@ -268,7 +272,7 @@ export const fetchGuestStatus = async (eventSlug, guestId) => {
 
 export const fetchPublicEvents = async () => {
     const context = '[Frontend API Service - fetchPublicEvents]';
-    console.log(`${context} Step 1: Fetching public events directory.`);
+    console.log(`${context} Step 1: Fetching public events directory from ${API_URL}/events`);
 
     try {
         const response = await fetch(`${API_URL}/events`, {
@@ -436,7 +440,7 @@ export const fetchGlobalGuests = async (page = 1, limit = 50) => {
             throw new Error(data.message || 'Failed to fetch the global guest directory.');
         }
 
-        return data; // Returns { success, data, pagination }
+        return data;
 
     } catch (error) {
         console.error(`${context} CRITICAL FAILURE: Network error fetching global guests.`, error.message);
