@@ -3,23 +3,20 @@
 
 console.log('[EmailService] Step 0: Initializing HTTP-based Email API module...');
 
-// ARCHITECT NOTE: Added eventName parameter to distinguish multi-tenant event registrations
+// --- 1. ACCESS CODE PIPELINE ---
 const sendAccessCode = async (email, fullName, accessCode, eventName) => {
-    const context = `[EmailService - ${eventName}]`;
+    const context = `[EmailService - Access - ${eventName}]`;
     console.log(`${context} Step 1: Preparing HTTP email payload for ${email}`);
 
     try {
-        // Infrastructure Check: Prevent silent failures if the environment is misconfigured
         if (!process.env.RESEND_API_KEY) {
-            console.error(`${context} CRITICAL FAILURE: RESEND_API_KEY environment variable is missing from Render.`);
+            console.error(`${context} CRITICAL FAILURE: RESEND_API_KEY environment variable is missing.`);
             throw new Error('Email API key not configured in the Control Plane.');
         }
 
         console.log(`${context} Step 2: Constructing JSON payload for HTTP dispatch...`);
         
-        // Construct the exact JSON structure required by the Resend REST API
         const payload = {
-            // If you verify a custom domain later, change this. Resend allows 'onboarding@resend.dev' for testing.
             from: process.env.EMAIL_FROM || 'onboarding@resend.dev', 
             to: [email],
             subject: `Your Access Code for ${eventName}`,
@@ -37,9 +34,8 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
             `
         };
 
-        console.log(`${context} Step 3: Payload constructed. Initiating secure HTTPS dispatch to Resend API (Port 443)...`);
+        console.log(`${context} Step 3: Initiating secure HTTPS dispatch to Resend API (Port 443)...`);
 
-        // Step 4: Network Dispatch via native Node.js fetch
         const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
@@ -52,7 +48,6 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
         const data = await response.json();
 
         if (!response.ok) {
-            // Failure Point Y: Caught if the API rejects our payload (e.g., invalid email formatting, bad API key)
             console.error(`${context} Failure Point Y: External API rejected the payload. Reason:`, data);
             throw new Error(data.message || 'Email API strictly rejected the HTTP request.');
         }
@@ -61,12 +56,103 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
         return true;
 
     } catch (error) {
-        // Failure Point Z: Caught if the network is completely down and the fetch fails to execute
-        console.error(`${context} CRITICAL FAILURE (Failure Point Z): Network or API dispatch pipeline shattered for ${email}.`, error.message);
-        throw error; // Rethrow to the controller
+        console.error(`${context} CRITICAL FAILURE (Failure Point Z): Network or API dispatch pipeline shattered.`, error.message);
+        throw error; 
+    }
+};
+
+// --- 2. THE ABYSS DISSOLVE PIPELINE ---
+const sendMeshExport = async (targetEmail, targetName, eventName, connections) => {
+    const context = `[EmailService - Abyss Export - ${eventName}]`;
+    console.log(`${context} Step 1: Preparing Mesh Export payload for ${targetEmail} with ${connections.length} echos.`);
+
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.error(`${context} CRITICAL FAILURE: RESEND_API_KEY environment variable is missing.`);
+            throw new Error('Email API key not configured.');
+        }
+
+        // Generate dynamic HTML for the connections list
+        let connectionsHtml = '';
+        if (connections.length === 0) {
+            connectionsHtml = '<p>You did not finalize any echos during this event.</p>';
+        } else {
+            connectionsHtml = `
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead>
+                        <tr style="background-color: #111827; color: #ffffff; text-align: left;">
+                            <th style="padding: 12px; border: 1px solid #374151;">Name</th>
+                            <th style="padding: 12px; border: 1px solid #374151;">Email</th>
+                            <th style="padding: 12px; border: 1px solid #374151;">Phone</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${connections.map(conn => `
+                            <tr>
+                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><strong>${conn.full_name}</strong></td>
+                                <td style="padding: 12px; border: 1px solid #e5e7eb;"><a href="mailto:${conn.email}" style="color: #2563eb;">${conn.email}</a></td>
+                                <td style="padding: 12px; border: 1px solid #e5e7eb;">${conn.phone || 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        console.log(`${context} Step 2: Dynamic HTML matrix generated. Constructing final JSON payload...`);
+
+        const payload = {
+            from: process.env.EMAIL_FROM || 'onboarding@resend.dev', 
+            to: [targetEmail],
+            subject: `Your Connections from ${eventName} - The Abyss`,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h1 style="color: #111827; margin: 0;">${eventName}</h1>
+                        <p style="color: #6b7280; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">The Abyss Dissolved</p>
+                    </div>
+                    
+                    <p>Hello ${targetName},</p>
+                    <p>The event has concluded, and the ephemeral network has been permanently dissolved. Below is the finalized graph of the echos you secured during your session.</p>
+                    
+                    ${connectionsHtml}
+                    
+                    <br/>
+                    <p style="color: #6b7280; font-size: 12px; text-align: center; margin-top: 40px;">
+                        This is an automated transmission from the Nexus Control Plane.
+                    </p>
+                </div>
+            `
+        };
+
+        console.log(`${context} Step 3: Initiating HTTPS dispatch to Resend...`);
+
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.error(`${context} Failure Point Y: External API rejected the Mesh Export. Reason:`, data);
+            throw new Error(data.message || 'Email API rejected the HTTP request.');
+        }
+        
+        console.log(`${context} Step 4: SUCCESS. Abyss Export delivered to ${targetEmail}. Trace ID: ${data.id}`);
+        return true;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE (Failure Point Z): Network failure on Mesh Export.`, error.message);
+        throw error; 
     }
 };
 
 module.exports = {
-    sendAccessCode
+    sendAccessCode,
+    sendMeshExport
 };
