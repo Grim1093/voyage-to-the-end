@@ -18,11 +18,16 @@ export default function GuestDashboard() {
     const [guest, setGuest] = useState(null);
 
     useEffect(() => {
-        console.log(`${context} Step 1: Dashboard mounted. Checking for secure session data.`);
+        console.log(`${context} Step 1: Dashboard mounted. Checking for secure cryptographic token.`);
+        
+        // [Architecture] Strict JWT Gatekeeper specific to this Node
+        const token = localStorage.getItem(`guestToken_${eventSlug}`);
         const sessionData = sessionStorage.getItem('guestData');
         
-        if (!sessionData) {
-            console.warn(`${context} Failure Point EE: Unauthorized access attempt. No guest data found. Redirecting to portal.`);
+        // If either the cryptographic token OR the hydrated data is missing, bounce them out
+        if (!token || !sessionData) {
+            console.warn(`${context} Failure Point EE: Unauthorized access attempt or token missing. Redirecting to portal.`);
+            sessionStorage.removeItem('guestData'); // Clean up partial state
             router.push(`/${eventSlug}/portal`);
             return;
         }
@@ -53,13 +58,15 @@ export default function GuestDashboard() {
         } catch (error) {
             console.error(`${context} Failure Point FF: Corrupted session data.`, error);
             sessionStorage.removeItem('guestData');
+            localStorage.removeItem(`guestToken_${eventSlug}`);
             router.push(`/${eventSlug}/portal`);
         }
     }, [router, eventSlug, context]);
 
     const handleLogout = () => {
-        console.log(`${context} Step 5: Guest initiated logout. Purging session data.`);
+        console.log(`${context} Step 5: Guest initiated logout. Purging secure session payload.`);
         sessionStorage.removeItem('guestData');
+        localStorage.removeItem(`guestToken_${eventSlug}`); // Purge the JWT
         router.push(`/${eventSlug}/portal`);
     };
 
@@ -171,7 +178,8 @@ export default function GuestDashboard() {
                                     </div>
                                     <div>
                                         <span className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Government ID</span>
-                                        <a href={guest.id_document_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-zinc-300 hover:text-white flex items-center gap-2 transition-colors">
+                                        {/* ARCHITECTURE FIX: Swapped flex to inline-flex to restrict click area to the text */}
+                                        <a href={guest.id_document_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-zinc-300 hover:text-white inline-flex items-center gap-2 transition-colors w-fit">
                                             Verify Submission
                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                         </a>

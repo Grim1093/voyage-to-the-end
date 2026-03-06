@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const bcrypt = require('bcrypt'); // [Architecture] Cryptographic salting
+const jwt = require('jsonwebtoken'); // [Architecture] Token minting
 const db = require('../config/db');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
@@ -16,7 +18,6 @@ const getEventBySlug = async (slug, context) => {
     };
 };
 
-// ARCHITECT NOTE: The New Global Guest Fetcher
 const getGlobalGuests = async (req, res) => {
     const context = 'GuestController - getGlobalGuests';
     logger.info(context, 'Master Admin fetching Global Guest Directory.');
@@ -28,7 +29,6 @@ const getGlobalGuests = async (req, res) => {
         
         const offset = (page - 1) * limit;
 
-        // Uses JSON_AGG to bundle all a guest's events into an array
         const fetchQuery = `
             SELECT 
                 g.id, 
@@ -125,17 +125,19 @@ const registerGuest = async (req, res) => {
             });
         }
 
-        const accessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-        logger.info(context, `Step 2: Generated secure access code for registration: ${accessCode}`);
+        // [Architecture] Cryptographic hashing of the access code
+        const rawAccessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        logger.info(context, `Step 2: Generated secure access code for registration. Salting and hashing...`);
+        const hashedAccessCode = await bcrypt.hash(rawAccessCode, 10);
 
         const insertRegQuery = `
             INSERT INTO event_registrations (
                 guest_id, event_id, id_number, id_document_url, dietary_restrictions, current_state, access_code
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7
-            ) RETURNING guest_id, current_state, access_code;
+            ) RETURNING guest_id, current_state;
         `;
-        const regValues = [guestId, eventId, idNumber, idDocumentUrl, dietaryRestrictions, 1, accessCode];
+        const regValues = [guestId, eventId, idNumber, idDocumentUrl, dietaryRestrictions, 1, hashedAccessCode];
 
         const result = await db.query(insertRegQuery, regValues);
         const newRegistration = result.rows[0];
@@ -143,9 +145,8 @@ const registerGuest = async (req, res) => {
         logger.stateChange(newRegistration.guest_id, 0, newRegistration.current_state);
         logger.info(context, `Successfully registered guest: ${newRegistration.guest_id} for event ID: ${eventId}`);
 
-        // ARCHITECT NOTE: Fire-and-forget email delivery. 
-        // We now successfully pass the eventName down to the email service.
-        emailService.sendAccessCode(email, fullName, accessCode, eventName)
+        // We dispatch the RAW code to the email, but only the HASH is in the DB
+        emailService.sendAccessCode(email, fullName, rawAccessCode, eventName)
             .then(() => {
                 logger.info(context, `Background email delivery successful for: ${email}`);
             })
@@ -304,20 +305,61 @@ const guestLogin = async (req, res) => {
         }
 
         const query = `
-            SELECT g.id, g.full_name, er.current_state, er.id_document_url, er.access_code, g.phone, er.dietary_restrictions 
+            SELECT g.id, g.email, g.full_name, er.current_state, er.id_document_url, er.access_code, g.phone, er.dietary_restrictions 
             FROM guests g
             JOIN event_registrations er ON g.id = er.guest_id
             WHERE g.email = $1 AND er.event_id = $2;
         `;
         const result = await db.query(query, [email, eventId]);
 
-        if (result.rowCount === 0 || result.rows[0].access_code !== accessCode.trim().toUpperCase()) {
-            logger.warn(context, `Failure Point BB: Login failed for ${email} at event ${eventSlug}`);
+        if (result.rowCount === 0) {
+            logger.warn(context, `Failure Point BB: Identity not found for ${email} at event ${eventSlug}`);
             return res.status(401).json({ success: false, message: 'Invalid email or access code.' });
         }
 
-        const { access_code, ...safeGuestData } = result.rows[0];
-        res.status(200).json({ success: true, data: safeGuestData });
+        const guest = result.rows[0];
+        const inputCode = accessCode.trim().toUpperCase();
+        let isMatch = false;
+
+        // [Architecture] Graceful Degradation for Legacy Plaintext Codes
+        if (guest.access_code.startsWith('$2b$') || guest.access_code.startsWith('$2a$')) {
+            isMatch = await bcrypt.compare(inputCode, guest.access_code);
+        } else {
+            isMatch = (inputCode === guest.access_code);
+            if (isMatch) {
+                logger.info(context, `Legacy plaintext code detected for ${email}. Executing background auto-upgrade to bcrypt...`);
+                const newHash = await bcrypt.hash(inputCode, 10);
+                await db.query(`UPDATE event_registrations SET access_code = $1 WHERE guest_id = $2 AND event_id = $3`, [newHash, guest.id, eventId]);
+            }
+        }
+
+        if (!isMatch) {
+            logger.warn(context, `Failure Point BB-2: Cryptographic mismatch for ${email} at event ${eventSlug}`);
+            return res.status(401).json({ success: false, message: 'Invalid email or access code.' });
+        }
+
+        if (!process.env.JWT_SECRET) {
+            logger.error(context, 'CRITICAL FAILURE: JWT_SECRET is missing from the environment.');
+            return res.status(500).json({ success: false, message: 'Internal server error.' });
+        }
+
+        // [Architecture] Minting the Guest JWT tied specifically to this Node
+        logger.info(context, `Step 3: Identity verified. Minting Guest JWT for Node ${eventId}...`);
+        const tokenPayload = {
+            id: guest.id,
+            email: guest.email,
+            eventId: eventId,
+            role: 'guest'
+        };
+
+        const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        const { access_code, ...safeGuestData } = guest;
+        res.status(200).json({ 
+            success: true, 
+            token: token,
+            data: safeGuestData 
+        });
 
     } catch (error) {
         logger.error(context, 'Failure Point E7: CRITICAL FAILURE during login.', error);
@@ -405,9 +447,8 @@ const resendAccessCode = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email is required.' });
         }
 
-        // We use a JOIN to ensure the global guest is actually registered for this specific event
         const query = `
-            SELECT g.full_name, er.access_code 
+            SELECT g.id as guest_id, g.full_name 
             FROM guests g
             JOIN event_registrations er ON g.id = er.guest_id
             WHERE g.email = $1 AND er.event_id = $2;
@@ -419,11 +460,16 @@ const resendAccessCode = async (req, res) => {
             return res.status(404).json({ success: false, message: 'No registration found for this email.' });
         }
 
-        // Safely map the database snake_case to our backend camelCase
-        const { full_name: fullName, access_code: accessCode } = result.rows[0];
+        const { guest_id, full_name: fullName } = result.rows[0];
 
-        // ARCHITECT NOTE: Fire-and-forget email retry using the patched email service
-        emailService.sendAccessCode(email, fullName, accessCode, event.name)
+        // [Architecture] Generate new code, hash it, overwrite the old one in DB
+        const rawNewCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        const hashedNewCode = await bcrypt.hash(rawNewCode, 10);
+
+        await db.query(`UPDATE event_registrations SET access_code = $1 WHERE guest_id = $2 AND event_id = $3`, [hashedNewCode, guest_id, event.id]);
+
+        // Email the RAW new code
+        emailService.sendAccessCode(email, fullName, rawNewCode, event.name)
             .then(() => {
                 logger.info(context, `Background email delivery successful for resend to: ${email}`);
             })
@@ -431,8 +477,7 @@ const resendAccessCode = async (req, res) => {
                 logger.error(context, `Failure Point R4-B: Background Email Resend Failed to ${email}.`, emailError);
             });
 
-        // Immediately unblock the UI
-        res.status(200).json({ success: true, message: 'Access code resent successfully.' });
+        res.status(200).json({ success: true, message: 'New access code generated and sent successfully.' });
 
     } catch (error) {
         logger.error(context, 'Failure Point R5: CRITICAL FAILURE during resend access code.', error);

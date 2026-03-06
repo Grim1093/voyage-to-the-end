@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 console.log('[Socket Auth] System initialized: Perimeter defense ready for injection.');
 
@@ -20,13 +21,18 @@ const socketAuthMiddleware = (socket, next) => {
         // [Architecture] Verify against the MSaaS Master Secret
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         
-        // [Architecture] State Injection: Attach the verified identity directly to the socket instance.
-        // This ensures all subsequent "echo" events know exactly who is firing them without re-verifying.
-        socket.guest = decoded; 
+        // [Architecture] Schema Normalization Bridge
+        // REST API mints { id, eventId }, but the Abyss (server.js) expects { guest_id, event_id }.
+        socket.guest = {
+            guest_id: decoded.id,        // Mapped from REST JWT
+            event_id: decoded.eventId,   // Mapped from REST JWT
+            role: decoded.role,
+            email: decoded.email
+        }; 
         
-        console.log(`[Socket Auth] Step 3: Signature verified. Guest ID [${decoded.guest_id || 'Admin'}] cleared for Abyss entry on Node [${decoded.event_id || 'Global'}].`);
+        console.log(`[Socket Auth] Step 3: Signature verified. Identity [${socket.guest.email}] (Role: ${socket.guest.role}) cleared for Abyss entry.`);
         
-        // Proceed to establish the connection
+        // Proceed to establish the bidirectional connection
         return next();
     } catch (error) {
         console.error(`[Socket Auth] Failure Point B: Cryptographic verification failed for socket [${socket.id}] - ${error.message}`);

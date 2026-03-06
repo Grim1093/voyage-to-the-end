@@ -1,8 +1,5 @@
 // --- SANITIZATION PIPELINE ---
-// Grab the API URL from our environment variables
 const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-
-// Self-healing URL parser: strips trailing slashes and ensures the /api namespace is targeted
 const API_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl.replace(/\/$/, '')}/api`;
 
 export const registerGuest = async (eventSlug, guestData) => {
@@ -21,7 +18,6 @@ export const registerGuest = async (eventSlug, guestData) => {
         });
 
         console.log(`${context} Step 3: Awaiting server response... Status: ${response.status}`);
-
         const data = await response.json();
 
         if (!response.ok) {
@@ -38,30 +34,34 @@ export const registerGuest = async (eventSlug, guestData) => {
     }
 };
 
-// --- SESSION VALIDATOR ---
-const getValidSessionKey = (context) => {
+// --- SESSION VALIDATOR: ADMIN VAULT ---
+const getValidToken = (context) => {
     if (typeof window === 'undefined') return null;
 
-    const sessionString = sessionStorage.getItem('adminSession');
-    if (!sessionString) {
-        console.error(`${context} Failure Point O: Session data missing!`);
+    // Extract the cryptographic token from the secure browser vault
+    const token = localStorage.getItem('adminToken');
+    
+    if (!token) {
+        console.error(`${context} Failure Point O: Cryptographic token missing! Session invalidated.`);
         throw new Error('Unauthorized: Please log in.');
     }
 
-    try {
-        const sessionData = JSON.parse(sessionString);
-        
-        // ARCHITECT NOTE: Removed static TTL check. Inactivity is now dynamically handled by the UI layer.
-        if (!sessionData.key) {
-            throw new Error('Unauthorized: Invalid session payload.');
-        }
+    return token;
+};
 
-        return sessionData.key;
-    } catch (error) {
-        console.error(`${context} Failure Point X: Session data corrupted.`);
-        sessionStorage.removeItem('adminSession');
-        throw new Error('Unauthorized: Invalid session data.');
+// --- SESSION VALIDATOR: GUEST PORTAL (NEW) ---
+const getValidGuestToken = (eventSlug, context) => {
+    if (typeof window === 'undefined') return null;
+
+    // [Architecture] Extracts the Node-specific Guest JWT
+    const token = localStorage.getItem(`guestToken_${eventSlug}`);
+    
+    if (!token) {
+        console.error(`${context} Failure Point O-G: Guest cryptographic token missing!`);
+        throw new Error('Unauthorized: Please log in to the portal.');
     }
+
+    return token;
 };
 
 // --- ADMIN READ PIPELINE ---
@@ -70,29 +70,17 @@ export const getAllGuests = async (eventSlug, page = 1, limit = 10, stateFilter 
     console.log(`${context} Step 1: Initiating fetch for guest ledger. Page: ${page}, Limit: ${limit}, State: ${stateFilter}`);
 
     try {
-        const adminKey = getValidSessionKey(context);
-        
-        if (!adminKey) {
-            console.error(`${context} Failure Point O: Admin key missing from sessionStorage! User is unauthenticated.`);
-            throw new Error('Unauthorized: Please log in.');
-        }
+        const token = getValidToken(context);
 
-        const params = new URLSearchParams({
-            page: page,
-            limit: limit
-        });
-        
-        if (stateFilter !== null && stateFilter !== '') {
-            params.append('state', stateFilter);
-        }
+        const params = new URLSearchParams({ page: page, limit: limit });
+        if (stateFilter !== null && stateFilter !== '') params.append('state', stateFilter);
 
         const url = `${API_URL}/guests/${eventSlug}?${params.toString()}`;
-
         console.log(`${context} Step 2: Sending secure GET request to ${url}`);
         
         const response = await fetch(url, {
             method: 'GET',
-            headers: { 'x-admin-key': adminKey }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await response.json();
@@ -111,19 +99,16 @@ export const getAllGuests = async (eventSlug, page = 1, limit = 10, stateFilter 
     }
 };
 
-// --- NEW LAZY LOAD GUEST DETAIL PIPELINE ---
 export const fetchGuestDetails = async (eventSlug, guestId) => {
     const context = `[Frontend API Service - fetchGuestDetails - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating fetch for extended guest profile ID: ${guestId}`);
 
     try {
-        const adminKey = getValidSessionKey(context);
-        if (!adminKey) throw new Error('Unauthorized: Please log in.');
-
+        const token = getValidToken(context);
         const url = `${API_URL}/guests/${eventSlug}/${guestId}`;
         const response = await fetch(url, {
             method: 'GET',
-            headers: { 'x-admin-key': adminKey }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await response.json();
@@ -141,20 +126,19 @@ export const fetchGuestDetails = async (eventSlug, guestId) => {
     }
 };
 
-// --- ADMIN STATE TRANSITION PIPELINE ---
 export const updateGuestState = async (eventSlug, guestId, newState, errorLog = null) => {
     const context = `[Frontend API Service - updateGuestState - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating state transition for ${guestId} to State ${newState}`);
 
     try {
-        const adminKey = getValidSessionKey(context);
+        const token = getValidToken(context);
         
         console.log(`${context} Step 2: Sending secure PATCH request to API...`);
         const response = await fetch(`${API_URL}/guests/${eventSlug}/${guestId}/state`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                'x-admin-key': adminKey
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({ newState, errorLog })
         });
@@ -207,7 +191,6 @@ export const loginGuest = async (eventSlug, email, accessCode) => {
     }
 };
 
-// ARCHITECT NOTE: New Recovery Fetcher for orphaned registrations
 export const resendAccessCode = async (eventSlug, email) => {
     const context = `[Frontend API Service - resendAccessCode - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating code recovery for ${email}`);
@@ -237,18 +220,22 @@ export const resendAccessCode = async (eventSlug, email) => {
     }
 };
 
-// --- NEW LIVE STATE SYNC PIPELINE ---
+// ARCHITECT NOTE: The newly secured Guest Status interceptor
 export const fetchGuestStatus = async (eventSlug, guestId) => {
     const context = `[Frontend API Service - fetchGuestStatus - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating live status sync for guest ID: ${guestId}`);
 
     try {
+        // [Architecture] Inject the Node-specific Guest JWT
+        const token = getValidGuestToken(eventSlug, context);
+        
         console.log(`${context} Step 2: Sending GET request to ${API_URL}/guests/${eventSlug}/${guestId}/status`);
         
         const response = await fetch(`${API_URL}/guests/${eventSlug}/${guestId}/status`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
             }
         });
 
@@ -269,7 +256,6 @@ export const fetchGuestStatus = async (eventSlug, guestId) => {
 };
 
 // --- EVENT MANAGEMENT PIPELINES ---
-
 export const fetchPublicEvents = async () => {
     const context = '[Frontend API Service - fetchPublicEvents]';
     console.log(`${context} Step 1: Fetching public events directory from ${API_URL}/events`);
@@ -294,18 +280,15 @@ export const fetchPublicEvents = async () => {
     }
 };
 
-// ARCHITECT NOTE: The highly secured Master Admin Fetcher
 export const fetchAllAdminEvents = async () => {
     const context = '[Frontend API Service - fetchAllAdminEvents]';
     console.log(`${context} Step 1: Fetching master ledger of all tenants.`);
 
     try {
-        const adminKey = getValidSessionKey(context);
-        if (!adminKey) throw new Error('Unauthorized: Please log in.');
-
+        const token = getValidToken(context);
         const response = await fetch(`${API_URL}/events/admin/all`, {
             method: 'GET',
-            headers: { 'x-admin-key': adminKey }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await response.json();
@@ -352,17 +335,13 @@ export const createEvent = async (eventData) => {
     console.log(`${context} Step 1: Initiating event creation payload...`, eventData);
 
     try {
-        const adminKey = getValidSessionKey(context);
-
-        if (!adminKey) {
-            throw new Error('Unauthorized: Please log in.');
-        }
+        const token = getValidToken(context);
 
         const response = await fetch(`${API_URL}/events`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-admin-key': adminKey
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(eventData),
         });
@@ -388,17 +367,13 @@ export const updateEventDetails = async (currentSlug, eventData) => {
     console.log(`${context} Step 1: Initiating event update payload...`, eventData);
 
     try {
-        const adminKey = getValidSessionKey(context);
-
-        if (!adminKey) {
-            throw new Error('Unauthorized: Please log in.');
-        }
+        const token = getValidToken(context);
 
         const response = await fetch(`${API_URL}/events/${currentSlug}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                'x-admin-key': adminKey
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(eventData),
         });
@@ -419,18 +394,16 @@ export const updateEventDetails = async (currentSlug, eventData) => {
     }
 };
 
-// ARCHITECT NOTE: Master Admin Global Guest Fetcher
 export const fetchGlobalGuests = async (page = 1, limit = 50) => {
     const context = '[Frontend API Service - fetchGlobalGuests]';
     console.log(`${context} Step 1: Fetching master global guest directory.`);
 
     try {
-        const adminKey = getValidSessionKey(context);
-        if (!adminKey) throw new Error('Unauthorized: Please log in.');
+        const token = getValidToken(context);
 
         const response = await fetch(`${API_URL}/guests/admin/all?page=${page}&limit=${limit}`, {
             method: 'GET',
-            headers: { 'x-admin-key': adminKey }
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await response.json();
@@ -448,23 +421,18 @@ export const fetchGlobalGuests = async (page = 1, limit = 50) => {
     }
 };
 
-// ARCHITECT NOTE: The Destructive Purge Protocol
 export const deleteEvent = async (eventSlug) => {
     const context = `[Frontend API Service - deleteEvent - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating destructive purge protocol for tenant ${eventSlug}...`);
 
     try {
-        const adminKey = getValidSessionKey(context);
-
-        if (!adminKey) {
-            throw new Error('Unauthorized: Please log in to perform this action.');
-        }
+        const token = getValidToken(context);
 
         const response = await fetch(`${API_URL}/events/${eventSlug}`, {
             method: 'DELETE',
             headers: {
                 'Content-Type': 'application/json',
-                'x-admin-key': adminKey
+                'Authorization': `Bearer ${token}`
             }
         });
 

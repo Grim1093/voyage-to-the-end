@@ -46,6 +46,7 @@ const corsDelegate = (origin, callback) => {
 const corsOptions = {
     origin: corsDelegate,
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    // [Architecture] Added 'Authorization' to allowed headers for JWT bearer token transmission
     allowedHeaders: ['Content-Type', 'x-admin-key', 'Authorization'], 
     credentials: true 
 };
@@ -117,13 +118,18 @@ app.set('io', io);
 
 // --- ROUTER MOUNTING ---
 try {
+    // [Architecture] Auth Router injected into the core pipeline
+    const authRoutes = require('./routes/authRoutes');
+    app.use('/api/auth', authRoutes);
+    console.log('[Router] Step 10: Master Security routing mounted at /api/auth');
+
     const guestRoutes = require('./routes/guestRoutes');
     app.use('/api/guests', guestRoutes);
-    console.log('[Router] Step 10: Guest Node routing mounted at /api/guests');
+    console.log('[Router] Step 11: Guest Node routing mounted at /api/guests');
 
     const eventRoutes = require('./routes/eventRoutes');
     app.use('/api/events', eventRoutes);
-    console.log('[Router] Step 11: Master Event routing mounted at /api/events');
+    console.log('[Router] Step 12: Master Event routing mounted at /api/events');
 } catch (error) {
     console.error('[Router] Failure Point B: Failed to mount routing modules.', error);
     process.exit(1);
@@ -138,17 +144,15 @@ app.get('/health', (req, res) => {
 // --- IGNITION SEQUENCE ---
 const startServer = async () => {
     try {
-        console.log('[Database] Step 12: Attempting connection to PostgreSQL Global Ledger...');
+        console.log('[Database] Step 13: Attempting connection to PostgreSQL Global Ledger...');
         await connectCache();
         await connectDB();
-        console.log('[Database] Step 13: Ledger uplink established successfully.');
-        await connectDB();
-        console.log('[Database] Step 13: Ledger uplink established successfully.');
+        console.log('[Database] Step 14: Ledger uplink established successfully.');
 
         startMeshDissolver();
         // [Architecture] We listen on httpServer now, NOT app
         httpServer.listen(PORT, () => {
-            console.log(`[ServerBoot] Step 14: Ignition complete. Nexus Control Plane listening on port ${PORT}`);
+            console.log(`[ServerBoot] Step 15: Ignition complete. Nexus Control Plane listening on port ${PORT}`);
         });
         
     } catch (error) {
