@@ -36,7 +36,13 @@ export default function MasterAdminLogin() {
         console.log(`${context} Step 1: Initiating secure handshake with Control Plane...`);
 
         try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+            // [Architecture] Mirroring the URL Sanitization Pipeline from api.js
+            const rawUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api').trim();
+            const cleanBase = rawUrl.replace(/\/+$/, ''); 
+            const apiUrl = cleanBase.endsWith('/api') ? cleanBase : `${cleanBase}/api`;
+            
+            console.log(`${context} Step 1.5: Dispatching to sanitized URL -> ${apiUrl}/auth/login`);
+
             const response = await fetch(`${apiUrl}/auth/login`, {
                 method: 'POST',
                 headers: {
@@ -48,7 +54,7 @@ export default function MasterAdminLogin() {
             const data = await response.json();
 
             if (!response.ok || !data.success) {
-                console.warn(`${context} Failure Point Auth-UI: Handshake rejected.`);
+                console.warn(`${context} Failure Point Auth-UI-1: Handshake rejected. Server responded with:`, data.message);
                 setError(data.message || 'Invalid credentials.');
                 setLoading(false);
                 return;
@@ -65,8 +71,9 @@ export default function MasterAdminLogin() {
             }, 500);
 
         } catch (err) {
-            console.error(`${context} CRITICAL FAILURE: Network boundary severed.`, err);
-            setError('Control Plane unreachable. Check network uplink.');
+            console.error(`${context} CRITICAL FAILURE (Failure Point Auth-UI-2): Network boundary severed.`, err.message);
+            // ARCHITECT NOTE: Exposing err.message so we can see if it's a CORS, Mixed Content, or DNS issue on Vercel.
+            setError(`Uplink Failed: ${err.message}`);
             setLoading(false);
         }
     };
