@@ -1,11 +1,18 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 const logger = require('../utils/logger');
+
+// ARCHITECT NOTE: Force Node.js 17+ to resolve DNS using IPv4 first.
+// Render's data center network drops outbound IPv6 SMTP traffic, which previously caused ENETUNREACH crashes.
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
 
 // ARCHITECT NOTE: The transport layer has been overhauled to use Nodemailer with Gmail OAuth2.
 // This architecture penetrates Render's data center IP blocks and bypasses "sandbox" restrictions without requiring a custom domain.
 // Strict Requirement: GMAIL_USER, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN must be in the environment variables.
 
-logger.info('[EmailService]', 'Step 0: Initializing OAuth2-based SMTP Email API module...');
+logger.info('[EmailService]', 'Step 0: Initializing OAuth2-based SMTP Email API module (IPv4 Forced)...');
 
 const createTransporter = () => {
     return nodemailer.createTransport({
