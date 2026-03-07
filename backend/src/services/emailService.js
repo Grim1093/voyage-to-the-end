@@ -1,45 +1,98 @@
-const nodemailer = require('nodemailer');
-const dns = require('dns');
 const logger = require('../utils/logger');
 
-// ARCHITECT NOTE: Force Node.js 17+ to resolve DNS using IPv4 first.
-// Render's data center network drops outbound IPv6 SMTP traffic, which previously caused ENETUNREACH crashes.
-if (dns.setDefaultResultOrder) {
-    dns.setDefaultResultOrder('ipv4first');
-}
+// ARCHITECT NOTE: The transport layer has been completely overhauled to use the native Gmail REST API via HTTPS (Port 443).
+// Render blocks standard SMTP ports (465, 587) on free tiers, causing ENETUNREACH timeouts. 
+// This architecture natively bypasses those firewall rules by communicating directly with Google's OAuth2 endpoints.
+// Strict Requirement: GMAIL_USER, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN must be in environment variables.
 
-// ARCHITECT NOTE: The transport layer has been overhauled to use Nodemailer with Gmail OAuth2.
-// This architecture penetrates Render's data center IP blocks and bypasses "sandbox" restrictions without requiring a custom domain.
-// Strict Requirement: GMAIL_USER, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN must be in the environment variables.
+logger.info('[EmailService]', 'Step 0: Initializing REST-based Gmail API transport module...');
 
-logger.info('[EmailService]', 'Step 0: Initializing OAuth2-based SMTP Email API module (IPv4 Forced)...');
-
-const createTransporter = () => {
-    return nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            type: 'OAuth2',
-            user: process.env.GMAIL_USER,
-            clientId: process.env.GMAIL_CLIENT_ID,
-            clientSecret: process.env.GMAIL_CLIENT_SECRET,
-            refreshToken: process.env.GMAIL_REFRESH_TOKEN
-        }
+// --- AUTHENTICATION PIPELINE ---
+const getAccessToken = async (context) => {
+    logger.info(context, 'Step 2.1: Requesting fresh OAuth2 Access Token from Google...');
+    
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            client_id: process.env.GMAIL_CLIENT_ID,
+            client_secret: process.env.GMAIL_CLIENT_SECRET,
+            refresh_token: process.env.GMAIL_REFRESH_TOKEN,
+            grant_type: 'refresh_token',
+        }),
     });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        logger.error(context, `Failure Point E-AUTH: Failed to mint access token. Details: ${JSON.stringify(data)}`);
+        throw new Error('OAuth2 Token generation failed.');
+    }
+
+    return data.access_token;
 };
+
+// --- MIME ENCODER ---
+const createBase64Email = (to, subject, htmlContent) => {
+    // Construct standard MIME email payload
+    const emailParts = [
+        `From: ${process.env.GMAIL_USER}`,
+        `To: ${to}`,
+        `Subject: =?utf-8?B?${Buffer.from(subject).toString('base64')}?=`,
+        'MIME-Version: 1.0',
+        'Content-Type: text/html; charset=utf-8',
+        '',
+        htmlContent,
+    ];
+
+    const rawEmail = emailParts.join('\n');
+    
+    // Google requires URL-safe Base64 encoding
+    return Buffer.from(rawEmail)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+};
+
+// --- GMAIL API DISPATCHER ---
+const dispatchEmail = async (context, to, subject, htmlContent) => {
+    const accessToken = await getAccessToken(context);
+    const encodedEmail = createBase64Email(to, subject, htmlContent);
+
+    logger.info(context, 'Step 2.2: Transmitting Base64 payload to Gmail REST endpoint (Port 443)...');
+
+    const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ raw: encodedEmail }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        logger.error(context, `Failure Point E-DISPATCH: Google REST API rejected payload. Details: ${JSON.stringify(data)}`);
+        throw new Error('Gmail REST API rejected the dispatch.');
+    }
+
+    return data;
+};
+
 
 // --- 1. ACCESS CODE PIPELINE ---
 const sendAccessCode = async (email, fullName, accessCode, eventName) => {
     const context = `[EmailService - Access - ${eventName}]`;
-    logger.info(context, `Step 1: Preparing OAuth2 email payload for ${email}`);
+    logger.info(context, `Step 1: Preparing REST email payload for ${email}`);
 
     try {
-        if (!process.env.GMAIL_USER || !process.env.GMAIL_REFRESH_TOKEN) {
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_REFRESH_TOKEN || !process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
             logger.error(context, 'Failure Point E1: Missing OAuth2 environment variables.');
-            throw new Error('Email OAuth2 credentials not configured in the Control Plane.');
+            throw new Error('Email OAuth2 credentials not configured.');
         }
 
-        logger.info(context, 'Step 2: Constructing HTML payload...');
-        
         const htmlContent = `
             <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
                 <h2>Welcome to ${eventName}, ${fullName}!</h2>
@@ -53,21 +106,13 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
             </div>
         `;
 
-        logger.info(context, 'Step 3: Initiating secure OAuth2 SMTP dispatch...');
+        const result = await dispatchEmail(context, email, `Your Access Code for ${eventName}`, htmlContent);
 
-        const transporter = createTransporter();
-        const info = await transporter.sendMail({
-            from: process.env.GMAIL_USER,
-            to: email,
-            subject: `Your Access Code for ${eventName}`,
-            html: htmlContent
-        });
-
-        logger.info(context, `Step 4: SUCCESS. Transporter verified delivery. Message ID: ${info.messageId}`);
+        logger.info(context, `Step 3: SUCCESS. REST transporter verified delivery. Google Thread ID: ${result.threadId}`);
         return true;
 
     } catch (error) {
-        logger.error(context, `Failure Point E2: Network or SMTP dispatch pipeline shattered. Details: ${error.message}`);
+        logger.error(context, `Failure Point E2: Network or REST dispatch pipeline shattered. Details: ${error.message}`);
         throw error; 
     }
 };
@@ -75,10 +120,10 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
 // --- 2. THE ABYSS DISSOLVE PIPELINE ---
 const sendMeshExport = async (targetEmail, targetName, eventName, connections) => {
     const context = `[EmailService - Abyss Export - ${eventName}]`;
-    logger.info(context, `Step 1: Preparing Mesh Export payload for ${targetEmail} with ${connections.length} echos.`);
+    logger.info(context, `Step 1: Preparing Mesh Export REST payload for ${targetEmail} with ${connections.length} echos.`);
 
     try {
-        if (!process.env.GMAIL_USER || !process.env.GMAIL_REFRESH_TOKEN) {
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_REFRESH_TOKEN || !process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
             logger.error(context, 'Failure Point E3: Missing OAuth2 environment variables.');
             throw new Error('Email OAuth2 credentials not configured.');
         }
@@ -109,8 +154,6 @@ const sendMeshExport = async (targetEmail, targetName, eventName, connections) =
             `;
         }
 
-        logger.info(context, 'Step 2: Dynamic HTML matrix generated. Constructing final transport payload...');
-
         const htmlContent = `
             <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
                 <div style="text-align: center; margin-bottom: 30px;">
@@ -130,17 +173,9 @@ const sendMeshExport = async (targetEmail, targetName, eventName, connections) =
             </div>
         `;
 
-        logger.info(context, 'Step 3: Initiating OAuth2 SMTP dispatch for Mesh Export...');
+        const result = await dispatchEmail(context, targetEmail, `Your Connections from ${eventName} - The Abyss`, htmlContent);
 
-        const transporter = createTransporter();
-        const info = await transporter.sendMail({
-            from: process.env.GMAIL_USER,
-            to: targetEmail,
-            subject: `Your Connections from ${eventName} - The Abyss`,
-            html: htmlContent
-        });
-
-        logger.info(context, `Step 4: SUCCESS. Abyss Export delivered to ${targetEmail}. Message ID: ${info.messageId}`);
+        logger.info(context, `Step 3: SUCCESS. Abyss Export delivered to ${targetEmail}. Google Thread ID: ${result.threadId}`);
         return true;
 
     } catch (error) {
