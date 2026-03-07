@@ -100,9 +100,16 @@ io.use(socketAuthMiddleware);
 io.on('connection', (socket) => {
     console.log(`[Abyss Transport] Step 8: Authenticated client handshake accepted. Socket ID: ${socket.id}`);
     
-    // [Architecture] Join a private room based on guest_id to receive direct echos
+    // [Architecture] Routing Configuration
     if (socket.guest && socket.guest.guest_id) {
+        // 1. Join Private Direct Mesh (for 1-on-1 echos)
         socket.join(`guest:${socket.guest.guest_id}`);
+        
+        // 2. Join Global Event Mesh (for the public feed)
+        if (socket.guest.event_id) {
+            socket.join(`event:${socket.guest.event_id}`);
+            console.log(`[Abyss Transport] Client dropped into Event Node: event:${socket.guest.event_id}`);
+        }
     }
 
     // Mount the core engine
@@ -113,12 +120,10 @@ io.on('connection', (socket) => {
     });
 });
 
-// Make `io` accessible globally if needed in your REST controllers (optional, but good for MSaaS triggers)
 app.set('io', io);
 
 // --- ROUTER MOUNTING ---
 try {
-    // [Architecture] Auth Router injected into the core pipeline
     const authRoutes = require('./routes/authRoutes');
     app.use('/api/auth', authRoutes);
     console.log('[Router] Step 10: Master Security routing mounted at /api/auth');
@@ -150,7 +155,7 @@ const startServer = async () => {
         console.log('[Database] Step 14: Ledger uplink established successfully.');
 
         startMeshDissolver();
-        // [Architecture] We listen on httpServer now, NOT app
+        
         httpServer.listen(PORT, () => {
             console.log(`[ServerBoot] Step 15: Ignition complete. Nexus Control Plane listening on port ${PORT}`);
         });

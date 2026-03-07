@@ -1,4 +1,6 @@
 const { redisClient } = require('../config/cache');
+// [Architecture] Inject the PostgreSQL ledger to permanently record public echos
+const db = require('../config/db'); 
 
 console.log('[Abyss Core] System initialized: Ephemeral Mesh controller ready for mounting.');
 
@@ -46,10 +48,59 @@ const registerAbyssHandlers = (io, socket) => {
         }
     });
 
+    // --- [NEW] EVENT 1.5: THE GLOBAL FEED (Public Broadcast) ---
+    socket.on('send_global_echo', async (payload, callback) => {
+        console.log(`[Abyss Core] Step 2.1: Guest [${guest_id}] emitting a global echo to Node [${event_id}]...`);
+        
+        try {
+            const { content } = payload;
+            
+            if (!content || content.trim() === '') {
+                console.warn(`[Abyss Core] Failure Point G-1: Empty echo rejected.`);
+                if (callback) callback({ success: false, message: 'Echo content cannot be empty.' });
+                return;
+            }
+
+            // 1. Commit the Echo to the Temporary Ledger
+            const insertQuery = `
+                INSERT INTO global_echos (event_id, guest_id, content)
+                VALUES ($1, $2, $3)
+                RETURNING id, content, created_at;
+            `;
+            const insertResult = await db.query(insertQuery, [event_id, guest_id, content.trim()]);
+            const newEcho = insertResult.rows[0];
+
+            // 2. Hydrate the Echo with the Sender's identity
+            const guestQuery = `SELECT full_name FROM guests WHERE id = $1`;
+            const guestResult = await db.query(guestQuery, [guest_id]);
+            const senderName = guestResult.rows[0].full_name;
+
+            const broadcastPayload = {
+                id: newEcho.id,
+                guest_id: guest_id,
+                sender_name: senderName,
+                content: newEcho.content,
+                created_at: newEcho.created_at
+            };
+
+            // 3. THE ABYSS: Fire the pulse to everyone in this specific Event Node
+            io.to(meshRoom).emit('receive_global_echo', broadcastPayload);
+            
+            console.log(`[Abyss Core] Step 2.2: Successfully broadcasted Echo ${newEcho.id} to Mesh Room [${meshRoom}].`);
+
+            // 4. Acknowledge success back to the sender's client
+            if (callback) callback({ success: true, data: broadcastPayload });
+
+        } catch (error) {
+            console.error(`[Abyss Core] Failure Point G-2: CRITICAL FAILURE processing global echo.`, error.message);
+            if (callback) callback({ success: false, message: 'Internal engine error.' });
+        }
+    });
+
     // --- EVENT 2: EMITTING AN ECHO (Connection Request) ---
     socket.on('send_echo', async (payload) => {
         const { target_guest_id } = payload;
-        console.log(`[Abyss Core] Step 3: Guest [${guest_id}] emitting an echo towards [${target_guest_id}]...`);
+        console.log(`[Abyss Core] Step 3: Guest [${guest_id}] emitting a direct echo towards [${target_guest_id}]...`);
 
         if (!target_guest_id) {
             return console.error(`[Abyss Core] Failure Point B: Echo emission failed. Missing target_guest_id.`);
@@ -108,6 +159,61 @@ const registerAbyssHandlers = (io, socket) => {
 
         } catch (error) {
             console.error(`[Abyss Core] Failure Point D: Failed to resolve echo state:`, error.message);
+        }
+    });
+
+
+    // --- EVENT 3.5: DIRECT MESSAGING (1-on-1 Chat) ---
+    socket.on('send_direct_message', async (payload, callback) => {
+        const { target_guest_id, content } = payload;
+        
+        if (!target_guest_id || !content || content.trim() === '') {
+            if (callback) callback({ success: false, message: 'Invalid payload.' });
+            return;
+        }
+
+        try {
+            // 1. Commit to the temporary ledger
+            const insertQuery = `
+                INSERT INTO direct_messages (event_id, sender_id, receiver_id, content)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id, content, created_at;
+            `;
+            const result = await db.query(insertQuery, [event_id, guest_id, target_guest_id, content.trim()]);
+            const newMsg = result.rows[0];
+
+            const dmPayload = {
+                id: newMsg.id,
+                sender_id: guest_id,
+                receiver_id: target_guest_id,
+                content: newMsg.content,
+                created_at: newMsg.created_at
+            };
+
+            // 2. THE ABYSS: Fire directly to the target guest's private mesh room
+            io.to(`guest:${target_guest_id}`).emit('receive_direct_message', dmPayload);
+            
+            // 3. Mirror it back to the sender (in case they are logged in on phone & laptop)
+            io.to(`guest:${guest_id}`).emit('receive_direct_message', dmPayload);
+
+            if (callback) callback({ success: true, data: dmPayload });
+
+        } catch (error) {
+            console.error(`[Abyss Core] Failure Point DM: Failed to route direct message:`, error.message);
+            if (callback) callback({ success: false, message: 'Engine failure.' });
+        }
+    });
+
+    // --- EVENT 3.6: TYPING PULSE (Ultra-Ephemeral) ---
+    socket.on('typing_pulse', (payload) => {
+        const { target_guest_id, is_typing } = payload;
+        
+        if (target_guest_id) {
+            // Instantly bounce the pulse to the target's private room
+            socket.to(`guest:${target_guest_id}`).emit('receive_typing_pulse', {
+                sender_id: guest_id,
+                is_typing: is_typing
+            });
         }
     });
 

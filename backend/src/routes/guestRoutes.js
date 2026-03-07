@@ -45,6 +45,50 @@ router.post('/:eventSlug/login', (req, res) => {
     guestController.guestLogin(req, res);
 });
 
+// ==========================================
+// THE ABYSS: SOCIAL HUB ROUTES
+// ==========================================
+
+/**
+ * Route: GET /api/guests/:eventSlug/echos
+ * Purpose: Retrieve the historical ledger of public echos for the Global Feed.
+ */
+router.get('/:eventSlug/echos', requireGuestToken, (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request for global echos at event: ${req.params.eventSlug}`);
+    guestController.getEventEchos(req, res);
+});
+
+/**
+ * Route: GET /api/guests/:eventSlug/directory
+ * Purpose: Retrieve the sanitized, public directory of verified guests for 1-on-1 networking.
+ */
+router.get('/:eventSlug/directory', requireGuestToken, (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request for public directory at event: ${req.params.eventSlug}`);
+    guestController.getPublicGuestDirectory(req, res);
+});
+
+/**
+ * Route: GET /api/guests/:eventSlug/echos/state
+ * Purpose: Hydrate the Direct Mesh UI with Valkey's current pending/accepted/online state.
+ */
+router.get('/:eventSlug/echos/state', requireGuestToken, (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request for Valkey Echo State at event: ${req.params.eventSlug}`);
+    guestController.getGuestEchoState(req, res);
+});
+
+/**
+ * Route: GET /api/guests/:eventSlug/messages/:targetId
+ * Purpose: Retrieve the private chat history between the current guest and a target guest.
+ */
+router.get('/:eventSlug/messages/:targetId', requireGuestToken, (req, res) => {
+    logger.info('GuestRoutes', `Incoming GET request for direct messages with target ${req.params.targetId} at event: ${req.params.eventSlug}`);
+    guestController.getDirectMessages(req, res);
+});
+
+// ==========================================
+// WILDCARD & ADMIN ROUTES (Must remain below static paths)
+// ==========================================
+
 /**
  * Route: GET /api/guests/:eventSlug/:id/status
  * Purpose: Lightweight endpoint to fetch the live verification state for the guest dashboard.

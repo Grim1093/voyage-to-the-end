@@ -159,6 +159,108 @@ export const updateGuestState = async (eventSlug, guestId, newState, errorLog = 
     }
 };
 
+export const fetchEventEchos = async (eventSlug) => {
+    const context = `[Frontend API Service - fetchEventEchos - ${eventSlug}]`;
+    console.log(`${context} Fetching Echo history...`);
+
+    try {
+        const token = getValidGuestToken(eventSlug, context);
+        
+        const response = await fetch(`${API_URL}/guests/${eventSlug}/echos`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to fetch echo history.');
+        }
+
+        return data.data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE:`, error.message);
+        throw error;
+    }
+};
+
+export const fetchGuestDirectory = async (eventSlug) => {
+    const context = `[Frontend API Service - fetchGuestDirectory - ${eventSlug}]`;
+    console.log(`${context} Fetching sanitized guest directory...`);
+
+    try {
+        const token = getValidGuestToken(eventSlug, context);
+        
+        const response = await fetch(`${API_URL}/guests/${eventSlug}/directory`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to fetch directory.');
+        }
+
+        return data.data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE:`, error.message);
+        throw error;
+    }
+};
+
+export const fetchGuestEchoState = async (eventSlug) => {
+    const context = `[Frontend API Service - fetchGuestEchoState - ${eventSlug}]`;
+    console.log(`${context} Hydrating ephemeral mesh state...`);
+
+    try {
+        const token = getValidGuestToken(eventSlug, context);
+        
+        const response = await fetch(`${API_URL}/guests/${eventSlug}/echos/state`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to fetch echo state.');
+        }
+
+        return data.data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE:`, error.message);
+        throw error;
+    }
+};
+
+export const fetchDirectMessages = async (eventSlug, targetId) => {
+    try {
+        const token = getValidGuestToken(eventSlug, 'fetchDirectMessages');
+        const response = await fetch(`${API_URL}/guests/${eventSlug}/messages/${targetId}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message);
+        return data.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
 // --- GUEST PORTAL PIPELINE ---
 export const loginGuest = async (eventSlug, email, accessCode) => {
     const context = `[Frontend API Service - loginGuest - ${eventSlug}]`;

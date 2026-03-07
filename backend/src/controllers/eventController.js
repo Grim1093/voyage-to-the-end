@@ -1,5 +1,7 @@
 const db = require('../config/db');
 const logger = require('../utils/logger');
+// [Architecture] Importing the Automated Edge Deployment Service
+const vercelService = require('../services/vercelService');
 
 // --- READ PIPELINES ---
 
@@ -94,14 +96,12 @@ const getEventBySlug = async (req, res) => {
     }
 };
 
-// [Architecture] NEW: Edge Proxy Domain Resolution Endpoint
 const getEventByDomain = async (req, res) => {
     const context = 'EventController - getEventByDomain';
     const { hostname } = req.params;
     logger.info(context, `Step 1: Edge Proxy requesting domain resolution for: ${hostname}`);
 
     try {
-        // [Architecture] We use the binary tree index created in Phase 2 for ultra-fast B-Tree traversal.
         const query = `
             SELECT slug, theme_config 
             FROM events 
@@ -115,7 +115,7 @@ const getEventByDomain = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Domain unallocated or event expired.' });
         }
 
-        logger.info(context, `Step 2: Domain [${hostname}] securely resolved to Node [${result.rows[0].slug}]. Transmitting payload to Edge Proxy...`);
+        logger.info(context, `Step 2: Domain [${hostname}] securely resolved to Node [${result.rows[0].slug}]. Transmitting payload...`);
 
         res.status(200).json({
             success: true,
@@ -155,16 +155,22 @@ const createEvent = async (req, res) => {
         if (checkResult.rowCount > 0) {
             const collision = checkResult.rows[0];
             if (collision.slug === slug) {
-                logger.warn(context, 'Failure Point EV-Deploy: Slug collision detected.');
                 return res.status(409).json({ success: false, message: 'An event with this URL slug already exists.' });
             }
             if (collision.name.toLowerCase() === name.toLowerCase()) {
-                logger.warn(context, 'Failure Point EV-Deploy: Name collision detected.');
                 return res.status(409).json({ success: false, message: 'An event with this exact Name already exists.' });
             }
             if (collision.custom_domain === safeCustomDomain) {
-                logger.warn(context, 'Failure Point EV-Deploy: Custom Domain collision detected.');
                 return res.status(409).json({ success: false, message: 'This Custom Domain is already mapped to another event.' });
+            }
+        }
+
+        // [Architecture] Automated Vercel Domain Injection
+        if (safeCustomDomain) {
+            try {
+                await vercelService.addCustomDomain(safeCustomDomain);
+            } catch (vercelError) {
+                return res.status(400).json({ success: false, message: vercelError.message });
             }
         }
 
@@ -224,7 +230,7 @@ const updateEvent = async (req, res) => {
         }
 
         logger.info(context, 'Step 2: Verifying target tenant exists...');
-        const checkExistQuery = `SELECT id FROM events WHERE slug = $1;`;
+        const checkExistQuery = `SELECT id, custom_domain FROM events WHERE slug = $1;`;
         const existResult = await db.query(checkExistQuery, [currentSlug]);
 
         if (existResult.rowCount === 0) {
@@ -232,7 +238,10 @@ const updateEvent = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Event not found.' });
         }
 
-        const eventId = existResult.rows[0].id;
+        const existingEvent = existResult.rows[0];
+        const eventId = existingEvent.id;
+        const oldCustomDomain = existingEvent.custom_domain;
+        
         const safeCustomDomain = customDomain && customDomain.trim() !== '' ? customDomain.trim() : null;
         const safeThemeConfig = themeConfig || {};
 
@@ -248,16 +257,28 @@ const updateEvent = async (req, res) => {
         if (collisionResult.rowCount > 0) {
             const collision = collisionResult.rows[0];
             if (collision.slug === slug) {
-                logger.warn(context, 'Failure Point EV-Update: Slug collision detected with another node.');
                 return res.status(409).json({ success: false, message: 'The requested URL slug is already in use by another event.' });
             }
             if (collision.name.toLowerCase() === name.toLowerCase()) {
-                logger.warn(context, 'Failure Point EV-Update: Name collision detected with another node.');
                 return res.status(409).json({ success: false, message: 'The requested Event Name is already in use by another event.' });
             }
             if (collision.custom_domain === safeCustomDomain) {
-                logger.warn(context, 'Failure Point EV-Update: Custom Domain collision detected with another node.');
                 return res.status(409).json({ success: false, message: 'This Custom Domain is already mapped to another event.' });
+            }
+        }
+
+        // [Architecture] Edge Proxy Reconciliation
+        // If the domain changed, remove the old one from Vercel and add the new one
+        if (oldCustomDomain !== safeCustomDomain) {
+            try {
+                if (oldCustomDomain) {
+                    await vercelService.removeCustomDomain(oldCustomDomain);
+                }
+                if (safeCustomDomain) {
+                    await vercelService.addCustomDomain(safeCustomDomain);
+                }
+            } catch (vercelError) {
+                return res.status(400).json({ success: false, message: vercelError.message });
             }
         }
 
@@ -314,7 +335,7 @@ const deleteEvent = async (req, res) => {
     logger.info(context, `Step 1: Admin initiated purge protocol for tenant: ${eventSlug}`);
 
     try {
-        const deleteQuery = `DELETE FROM events WHERE slug = $1 RETURNING id, name;`;
+        const deleteQuery = `DELETE FROM events WHERE slug = $1 RETURNING id, name, custom_domain;`;
         const result = await db.query(deleteQuery, [eventSlug]);
 
         if (result.rowCount === 0) {
@@ -322,7 +343,18 @@ const deleteEvent = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Event not found.' });
         }
 
-        logger.info(context, `Step 2: Tenant ${result.rows[0].name} and all cascading data successfully obliterated.`);
+        const deletedEvent = result.rows[0];
+
+        // [Architecture] Purge the custom domain from Vercel to free it up globally
+        if (deletedEvent.custom_domain) {
+            try {
+                await vercelService.removeCustomDomain(deletedEvent.custom_domain);
+            } catch (vercelError) {
+                logger.warn(context, `Domain purge warning: ${vercelError.message}. Database deletion will proceed regardless.`);
+            }
+        }
+
+        logger.info(context, `Step 2: Tenant ${deletedEvent.name} and all cascading data successfully obliterated.`);
         res.status(200).json({ 
             success: true, 
             message: 'Tenant environment has been securely purged.' 
