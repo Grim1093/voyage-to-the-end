@@ -14,13 +14,12 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
   - Custom React Server Components and Next.js App Router for high-performance navigation and rendering.
 - **Global Directory:** Public-facing hub for discovering and accessing events.
 - **Telemetry Rule:** Comprehensive server-side logging at every step of the backend data pipeline.
+- **The Abyss (Transport Layer):** WebSocket and Valkey (Redis) integration for real-time mesh connectivity. Ephemeral event meshes and direct messaging between guests.
 
 ## Complete Project Structure
 
 ```text
 .
-├── README.md
-├── prompt.md
 ├── backend
 │   ├── .gitignore
 │   ├── README.md
@@ -57,158 +56,162 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 │           ├── logger.js
 │           ├── migrateAbyss.js
 │           └── migrateThemes.js
-└── frontend
-    ├── .gitignore
-    ├── README.md
-    ├── components.json
-    ├── eslint.config.mjs
-    ├── jsconfig.json
-    ├── next.config.mjs
-    ├── package-lock.json
-    ├── package.json
-    ├── postcss.config.mjs
-    ├── public
-    │   ├── file.svg
-    │   ├── globe.svg
-    │   ├── next.svg
-    │   ├── vercel.svg
-    │   └── window.svg
-    └── src
-        ├── app
-        │   ├── [eventSlug]
-        │   │   ├── page.js
-        │   │   ├── portal
-        │   │   │   ├── dashboard
-        │   │   │   │   └── page.js
-        │   │   │   └── page.js
-        │   │   └── register
-        │   │       └── page.js
-        │   ├── admin
-        │   │   ├── [eventSlug]
-        │   │   │   └── page.js
-        │   │   ├── events
-        │   │   │   ├── [eventSlug]
-        │   │   │   │   └── edit
-        │   │   │   │       └── page.js
-        │   │   │   └── new
-        │   │   │       └── page.js
-        │   │   ├── login
-        │   │   │   └── page.js
-        │   │   └── page.js
-        │   ├── favicon.ico
-        │   ├── globals.css
-        │   ├── layout.js
-        │   ├── page.js
-        │   └── test-cursor
-        │       └── page.js
-        ├── components
-        │   ├── AbyssProvider.jsx
-        │   ├── GuestIntakeForm.jsx
-        │   ├── portal
-        │   │   ├── GlobalFeed.jsx
-        │   │   └── GuestDirectory.jsx
-        │   └── ui
-        │       ├── ambient-aurora.jsx
-        │       ├── custom-cursor.jsx
-        │       ├── encrypted-text.jsx
-        │       ├── interactive-aura.jsx
-        │       └── luma-dropdown.jsx
-        ├── lib
-        │   └── utils.js
-        ├── proxy.js
-        └── services
-            └── api.js
+├── frontend
+│   ├── .gitignore
+│   ├── README.md
+│   ├── components.json
+│   ├── eslint.config.mjs
+│   ├── jsconfig.json
+│   ├── next.config.mjs
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── public
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
+│   └── src
+│       ├── app
+│       │   ├── [eventSlug]
+│       │   │   ├── page.js
+│       │   │   ├── portal
+│       │   │   │   ├── dashboard
+│       │   │   │   │   └── page.js
+│       │   │   │   └── page.js
+│       │   │   └── register
+│       │   │       └── page.js
+│       │   ├── admin
+│       │   │   ├── [eventSlug]
+│       │   │   │   └── page.js
+│       │   │   ├── events
+│       │   │   │   ├── [eventSlug]
+│       │   │   │   │   └── edit
+│       │   │   │   │       └── page.js
+│       │   │   │   └── new
+│       │   │   │       └── page.js
+│       │   │   ├── login
+│       │   │   │   └── page.js
+│       │   │   └── page.js
+│       │   ├── favicon.ico
+│       │   ├── globals.css
+│       │   ├── layout.js
+│       │   ├── page.js
+│       │   └── test-cursor
+│       │       └── page.js
+│       ├── components
+│       │   ├── AbyssProvider.jsx
+│       │   ├── GuestIntakeForm.jsx
+│       │   ├── portal
+│       │   │   ├── GlobalFeed.jsx
+│       │   │   └── GuestDirectory.jsx
+│       │   └── ui
+│       │       ├── ambient-aurora.jsx
+│       │       ├── custom-cursor.jsx
+│       │       ├── encrypted-text.jsx
+│       │       ├── interactive-aura.jsx
+│       │       └── luma-dropdown.jsx
+│       ├── lib
+│       │   └── utils.js
+│       └── services
+│           └── api.js
+└── prompt.md
 ```
 
 ## Detailed File and Folder Definitions
 
 ### Root Level
-- **`.`**: The root of the project ecosystem.
+- **`. `**: The root of the project ecosystem.
 - **`README.md`**: Master architecture overview detailing main principles, global milestones, architecture terminology (Tenants/Nodes, Global Ledger, Control Plane), and tech stack.
 - **`prompt.md`**: This generated comprehensive breakdown of the project status and architecture (including the original prompt).
 
 ### Backend (`/backend`)
-Handles the API, PostgreSQL connectivity (Aiven), Data Layer, and strict telemetry via server-side logging. Runs on Node.js/Express.js.
+Handles the API, PostgreSQL connectivity (Aiven), Data Layer, real-time WebSocket infrastructure (The Abyss), and strict telemetry via server-side logging. Runs on Node.js/Express.js.
 - **`backend/.gitignore`**: Excludes `node_modules`, `.env`, and other non-tracked backend assets from git.
 - **`backend/README.md`**: Details backend setup (requires Aiven DB via `pg`), folder structure, and the rigorous "Telemetry Rule".
-- **`backend/package.json` & `package-lock.json`**: Dependencies and scripts for the backend Node.js application.
+- **`backend/package.json` & `package-lock.json`**: Dependencies and scripts for the backend Node.js application, including express, socket.io, ioredis, pg.
+- **`backend/migrate.js`**: Command-line entry point to manually or automatically run database migrations (calls `setupDb.js`).
 - **`backend/database/`**: Contains raw SQL files and logic for db structuring.
-  - **`init.sql`**: SQL scripts to initialize tables (e.g. `events`, `event_images`, `guests`, `event_registrations`) with precise schema constraints.
-- **`backend/migrate.js`**: Command-line entry point to manually or automatically run database migrations.
+  - **`init.sql`**: SQL scripts to initialize tables (e.g., `events`, `event_images`, `guests`, `event_registrations`, `direct_messages`) with precise schema constraints and foreign keys. Includes UUID extension.
 - **`backend/scripts/`**: Utilities for initial environment bootstrapping.
-  - **`setupDb.js`**: Script to connect and inject base records or structures upon initial setup.
+  - **`setupDb.js`**: Script to connect to Aiven PostgreSQL and execute the `init.sql` blueprint to inject base records or structures upon initial setup.
 - **`backend/src/`**: Source folder for all server-side application logic.
   - **`config/`**: Contains system configurations.
-    - **`cache.js`**: Manages cache layer configuration for performance tuning.
+    - **`cache.js`**: Manages Valkey/Redis cache layer configuration for performance tuning and pub/sub.
     - **`db.js`**: PostgreSQL connection pool setup via the `pg` library. Expects `sslmode=require` for Aiven connectivity.
-  - **`controllers/`**: Express route handlers separating business logic from routing.
-    - **`abyssController.js`**: Handles logic specific to "Abyss", presumably an advanced backend service or data extraction toolset based on the premium MSaaS naming.
-    - **`authController.js`**: Handles administrative control plane authentication.
-    - **`eventController.js`**: Handles full CRUD lifecycle for Event Tenants. Includes complex querying logic (`json_agg` for image associations).
-    - **`guestController.js`**: Manages guest onboarding, profiles, and associated records.
+  - **`controllers/`**: Express route handlers separating business logic from routing, as well as WebSocket handlers.
+    - **`abyssController.js`**: Central control hub for The Abyss (WebSockets). Handles ephemeral mesh logic, echos, direct messaging, and socket connection states.
+    - **`authController.js`**: Handles administrative control plane authentication (Admin Login logic).
+    - **`eventController.js`**: Manages full CRUD lifecycle for Event Tenants. Includes complex querying logic (`json_agg` for image associations). Uses VercelService.
+    - **`guestController.js`**: Manages guest onboarding, profiles, JWT token minting, and associated records.
   - **`middleware/`**: Request interceptors.
-    - **`authMiddleware.js`**: Protects secure admin/control plane routes.
-    - **`socketAuth.js`**: Authentication mechanisms specifically tailored for WebSockets/real-time communication layers.
+    - **`authMiddleware.js`**: REST API protection. Secures admin routes with JWT verification (`requireAdminKey`) and guest routes with Anti-IDOR shields (`requireGuestToken`).
+    - **`socketAuth.js`**: Perimeter defense for WebSockets. Validates JWT payloads from socket handshakes to authenticate users into The Abyss.
   - **`routes/`**: Defines HTTP API paths and routes them to appropriate controllers.
-    - **`authRoutes.js`**: Routes for admin login/session creation.
-    - **`eventRoutes.js`**: Routes for retrieving, modifying, creating, and deleting Events.
-    - **`guestRoutes.js`**: Routes for managing attendees within a node.
-  - **`server.js`**: The main Express server entry point. Configures middleware, attaches routes, and starts listening on the defined `PORT`.
+    - **`authRoutes.js`**: Routes for admin login/session creation (`/api/auth`).
+    - **`eventRoutes.js`**: Routes for retrieving, modifying, creating, and deleting Events (`/api/events`).
+    - **`guestRoutes.js`**: Routes for managing attendees within a node, including global admin view (`/api/guests`).
+  - **`server.js`**: The master Control Plane boot sequence. Wraps Express with an HTTP server, configures CORS, mounts Socket.io (The Abyss), establishes Valkey scaling, mounts routes, and initiates DB/Cache uplinks.
   - **`services/`**: Encapsulates external API integrations and advanced asynchronous background tasks.
-    - **`emailService.js`**: For transactional email dispatching.
-    - **`meshDissolver.js`**: A specialized service, likely for image/asset processing or visual background manipulation for the cinematic aesthetic.
-    - **`vercelService.js`**: Integrations with Vercel APIs (e.g., dynamically provisioning subdomains or triggering deployments for new nodes).
+    - **`emailService.js`**: Dispatches transactional emails via direct HTTPS REST API transport (e.g. Resend) to bypass SMTP firewall issues.
+    - **`meshDissolver.js`**: Ephemeral CRON worker responsible for querying expired Nodes and initiating their teardown/archival process.
+    - **`vercelService.js`**: Integrations with Vercel APIs for dynamic project management.
   - **`utils/`**: Shared helper functions.
-    - **`createAdmin.js`**: Utility script to seed an administrative root account into the database.
-    - **`logger.js`**: Implements the "Telemetry Rule". A custom utility heavily utilized to log every step of the data pipeline.
-    - **`migrateAbyss.js` & `migrateThemes.js`**: Utilities for migrating advanced aesthetic settings or legacy data structures to new formats.
+    - **`createAdmin.js`**: CLI utility script to securely hash a password and seed an administrative root account into the Global Ledger.
+    - **`logger.js`**: The core of the "Telemetry Rule." Standardizes logging with formatted timestamps, context, and levels (INFO, WARN, ERROR).
+    - **`migrateAbyss.js`**: Schema mutation script injecting states like `mesh_dissolved` to track The Abyss lifecycle in the database.
+    - **`migrateThemes.js`**: Schema migration script upgrading the MSaaS for Edge-Rendering and theme configurations.
 
 ### Frontend (`/frontend`)
-The presentation layer built on Next.js 14+ App Router, utilizing React, Tailwind CSS, and Framer Motion. Engineered for GPU optimization and cinematic UI/UX.
+The presentation layer built on Next.js 14+ App Router, utilizing React, Tailwind CSS v4, and Framer Motion. Engineered for GPU optimization and cinematic UI/UX.
 - **`frontend/.gitignore`**: Excludes local builds (`.next`), dependencies (`node_modules`), and secrets.
 - **`frontend/README.md`**: Outlines the frontend tech stack, setup process, and the core philosophies: hardware acceleration, App Router structures, and Framer Motion capabilities.
-- **`frontend/components.json`**: Likely a configuration file for a UI library generator (e.g., shadcn/ui).
-- **`frontend/eslint.config.mjs` & `jsconfig.json` & `postcss.config.mjs`**: Code linting, JavaScript language support, and Tailwind CSS transformation settings.
-- **`frontend/next.config.mjs`**: Next.js core framework configurations (routing rewrites, external image domains, performance tweaks).
-- **`frontend/package.json` & `package-lock.json`**: Dependencies (Tailwind, Framer Motion, Next.js, etc.) and scripts.
+- **`frontend/components.json`**: Shadcn/UI configuration linking aliases to standard paths.
+- **`frontend/eslint.config.mjs`**: Custom ESLint configuration leveraging Next.js web vitals rules.
+- **`frontend/jsconfig.json`**: Sets up absolute import paths (e.g., `@/*`).
+- **`frontend/next.config.mjs`**: Next.js core framework configurations, specifically allowing remote image patterns from domains like `i.postimg.cc`.
+- **`frontend/package.json` & `package-lock.json`**: Dependencies (Tailwind, Framer Motion, Next.js, socket.io-client) and scripts.
+- **`frontend/postcss.config.mjs`**: Configures PostCSS with the `@tailwindcss/postcss` plugin.
 - **`frontend/public/`**: Static public assets (`.svg` files).
-- **`frontend/proxy.js`**: A proxy configuration for handling requests between the frontend and backend efficiently during local dev, bypassing CORS complexities.
+  - **`file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, `window.svg`**: Standard static images.
 - **`frontend/src/`**: Main directory containing all view, component, and logic layers.
-  - **`app/`**: Next.js App Router root.
-    - **`favicon.ico`**, **`globals.css`**, **`layout.js`**: Global site settings, Tailwind imports, and root application wrapper.
-    - **`page.js`**: The Global Public Directory. The entry point displaying all accessible global nodes.
-    - **`[eventSlug]/`**: Dynamic route grouping representing isolated Tenant/Node contexts.
-      - **`page.js`**: The public-facing Event Hub homepage for a specific event node.
-      - **`portal/`**: Post-registration, gated access areas for approved guests.
-        - **`page.js`**: Portal root/lobby.
-        - **`dashboard/page.js`**: Inside the event portal, containing personal schedules or networking feeds.
-      - **`register/page.js`**: The onboarding page where a guest applies to attend a node.
-    - **`admin/`**: The Control Plane.
-      - **`page.js`**: Main dashboard overview for platform admins.
-      - **`login/page.js`**: Authentication gateway for the Control Plane.
-      - **`events/`**: Control Plane event management.
-        - **`new/page.js`**: Interface to create a brand new Event node.
-        - **`[eventSlug]/edit/page.js`**: Interface to modify existing Event nodes.
-      - **`[eventSlug]/page.js`**: Admin-specific view of a particular node's metrics and settings.
+  - **`app/`**: Next.js App Router root defining the directory structure.
+    - **`favicon.ico`**: Site icon.
+    - **`globals.css`**: Master stylesheet injecting Tailwind CSS, custom scrollbars, and extensive dark/light mode OKLCH color variables for the premium aesthetic.
+    - **`layout.js`**: The Root Layout defining HTML structure, loading Google Fonts (Geist), and mounting the global CustomCursor component.
+    - **`page.js`**: The Global Public Directory (`/`). Landing page retrieving public events and displaying an EncryptedText banner over an AmbientAurora.
     - **`test-cursor/page.js`**: A sandbox page for experimenting with custom GPU-accelerated cursor animations.
+    - **`[eventSlug]/`**: Dynamic route grouping representing isolated Tenant/Node contexts.
+      - **`page.js`**: The public-facing Event Hub homepage for a specific event node (`/[eventSlug]`).
+      - **`register/page.js`**: Onboarding page housing the GuestIntakeForm (`/[eventSlug]/register`).
+      - **`portal/`**: Post-registration, gated access areas for approved guests.
+        - **`page.js`**: Portal login lobby for returning guests to verify their access code (`/[eventSlug]/portal`).
+        - **`dashboard/page.js`**: Inside the event portal. Wraps child components in the AbyssProvider for real-time mesh connectivity and renders GlobalFeed/GuestDirectory.
+    - **`admin/`**: The Control Plane.
+      - **`page.js`**: Main dashboard overview for platform admins, showing active events and global guests.
+      - **`login/page.js`**: Authentication gateway requiring the admin vault credentials.
+      - **`events/`**: Control Plane event management.
+        - **`new/page.js`**: Form interface to deploy a brand new Event node.
+        - **`[eventSlug]/edit/page.js`**: Form interface to modify details of an existing Event node.
+      - **`[eventSlug]/page.js`**: Admin-specific ledger view of a particular node's metrics, managing guests and states.
   - **`components/`**: Reusable React components.
-    - **`AbyssProvider.jsx`**: A React Context provider handling global application state, likely associated with premium UI capabilities.
-    - **`GuestIntakeForm.jsx`**: Reusable form component to handle guest registrations securely.
+    - **`AbyssProvider.jsx`**: Global React Context connecting `socket.io-client` to the backend Abyss engine for real-time state.
+    - **`GuestIntakeForm.jsx`**: Client-side form securely managing guest registrations payload and API communication.
     - **`portal/`**: Components exclusively used within the gated `app/[eventSlug]/portal/` environment.
-      - **`GlobalFeed.jsx`**: A real-time timeline/feed component for event updates.
-      - **`GuestDirectory.jsx`**: An interface to discover and view other attendees at a specific node.
-    - **`ui/`**: Low-level, generic, or highly styled atomic components.
-      - **`ambient-aurora.jsx`**: A hardware-accelerated, custom zero-blur radial gradient backdrop component ensuring 60fps cinematic feel.
-      - **`custom-cursor.jsx`**: Replaces the default OS cursor with an interactive, animated variant.
-      - **`encrypted-text.jsx`**: Text component that provides a visually interesting "decoding" or "scrambling" visual effect on appearance.
-      - **`interactive-aura.jsx`**: A component emitting a subtle interactive glow effect, reacting to user interaction.
-      - **`luma-dropdown.jsx`**: A highly styled, interactive dropdown menu mimicking high-end UI systems (like Luma).
+      - **`GlobalFeed.jsx`**: A real-time timeline/feed component pushing and pulling echos (messages) via the Abyss.
+      - **`GuestDirectory.jsx`**: Real-time interface to discover, view presence, and directly message other attendees in the specific mesh node.
+    - **`ui/`**: Low-level, generic, highly styled atomic components (frequently utilizing Framer Motion).
+      - **`ambient-aurora.jsx`**: A hardware-accelerated, zero-blur radial gradient backdrop component ensuring 60fps cinematic feel.
+      - **`custom-cursor.jsx`**: Replaces default OS cursor with an interactive, animated variant tracking raw mouse coordinates and applying LERP liquid rings.
+      - **`encrypted-text.jsx`**: Text component providing a scrambling visual "decoding" effect via interval-based character swapping.
+      - **`interactive-aura.jsx`**: A lobotomized (neutralized) component maintained for architecture compatibility but returning null to save GPU cycles.
+      - **`luma-dropdown.jsx`**: Highly styled, Framer Motion-animated interactive dropdown menu.
   - **`lib/`**: Generic, UI-agnostic helper functions for the frontend.
-    - **`utils.js`**: Common utilities (e.g., Tailwind class merging with `clsx` and `tailwind-merge`).
+    - **`utils.js`**: Common utilities exporting a `cn` function for merging Tailwind classes with `clsx` and `tailwind-merge`.
   - **`services/`**: Client-side API fetching utilities.
-    - **`api.js`**: Functions utilizing `fetch` or `axios` to communicate with the backend (`/backend/src/routes`).
+    - **`api.js`**: Centralized fetch wrapper exposing functions (e.g. `registerGuest`, `fetchPublicEvents`) to communicate with the backend REST endpoints. Includes response parsing and base URL sanitization.
 
 ---
 
-create a new prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and define each file in detail about what it does and define each faldder about what it does
-and in the end  of the file copy this prompt
+update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then  define each file in detail about what it does and define each folder about what it does and in the end of the file copy this prompt
