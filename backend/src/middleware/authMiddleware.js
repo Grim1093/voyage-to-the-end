@@ -1,48 +1,108 @@
+const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
-// Ensure dotenv is loaded so we can read the secret key
 require('dotenv').config(); 
 
 const requireAdminKey = (req, res, next) => {
-    const context = 'AuthMiddleware';
-    logger.info(context, `Step 1: Intercepted request to protected route: ${req.originalUrl}`);
+    const context = 'AuthMiddleware - Admin';
+    logger.info(context, `Step 1: Intercepted request to protected admin route: ${req.originalUrl}`);
 
-    // Step 2: Extract the custom header
-    const providedKey = req.headers['x-admin-key'];
+    const authHeader = req.headers.authorization;
 
-    // Step 3: Check if key is completely missing (Failure Point H)
-    if (!providedKey) {
-        logger.warn(context, 'Access Denied (Failure Point H): Missing x-admin-key header.');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        logger.warn(context, 'Access Denied (Failure Point H): Missing or malformed Bearer token.');
         return res.status(401).json({ 
             success: false, 
-            message: 'Unauthorized: Admin key required.' 
+            message: 'Unauthorized: Cryptographic token required.' 
         });
     }
 
-    // Step 4: Check if the server configuration is secure (Failure Point J)
-    const VALID_KEY = process.env.ADMIN_API_KEY;
-    
-    if (!VALID_KEY) {
-        logger.error(context, 'CRITICAL FAILURE (Failure Point J): ADMIN_API_KEY is not defined in the .env file!');
+    const token = authHeader.split(' ')[1];
+    const secret = process.env.JWT_SECRET;
+
+    if (!secret) {
+        logger.error(context, 'CRITICAL FAILURE (Failure Point J): JWT_SECRET is not defined in the Control Plane environment!');
         return res.status(500).json({ 
             success: false, 
             message: 'Internal Server Error: Security configuration missing.' 
         });
     }
 
-    // Step 5: Validate the provided key against the secure environment variable (Failure Point I)
-    if (providedKey !== VALID_KEY) {
-        logger.warn(context, 'Access Denied (Failure Point I): Invalid x-admin-key provided.');
+    try {
+        const decoded = jwt.verify(token, secret);
+
+        if (decoded.role !== 'superadmin') {
+            logger.warn(context, `Access Denied (Failure Point K): Valid token, but insufficient privileges for ${decoded.email}.`);
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Forbidden: Insufficient clearance.' 
+            });
+        }
+
+        logger.info(context, `Step 6: Signature verified. Access granted to Superadmin: ${decoded.email}`);
+        req.admin = decoded;
+        next();
+
+    } catch (error) {
+        logger.warn(context, `Access Denied (Failure Point I): Token verification failed - ${error.message}`);
         return res.status(403).json({ 
             success: false, 
-            message: 'Forbidden: Invalid admin credentials.' 
+            message: 'Forbidden: Invalid or expired token.' 
+        });
+    }
+};
+
+// ARCHITECTURE: The Guest Bouncer with IDOR Protection
+const requireGuestToken = (req, res, next) => {
+    const context = 'AuthMiddleware - Guest';
+    logger.info(context, `Step 1: Intercepted request to protected guest portal route: ${req.originalUrl}`);
+
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        logger.warn(context, 'Access Denied: Missing or malformed Bearer token.');
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Unauthorized: Cryptographic token required.' 
         });
     }
 
-    // Step 6: Success. Pass control to the next function
-    logger.info(context, 'Step 6: Admin key validated securely via environment variables.');
-    next();
+    const token = authHeader.split(' ')[1];
+    const secret = process.env.JWT_SECRET;
+
+    try {
+        const decoded = jwt.verify(token, secret);
+
+        if (decoded.role !== 'guest') {
+            logger.warn(context, `Access Denied: Invalid role clearance. Expected 'guest', received '${decoded.role}'.`);
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Forbidden: Insufficient clearance.' 
+            });
+        }
+
+        // [Architecture] Anti-IDOR Shield: Ensure guests can only access their own specific data payloads
+        if (req.params.id && req.params.id !== decoded.id) {
+            logger.warn(context, `CRITICAL SECURITY EVENT: IDOR Attempt Blocked. Token ID [${decoded.id}] attempted to access Route ID [${req.params.id}].`);
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Forbidden: Cross-account access violently rejected.' 
+            });
+        }
+
+        logger.info(context, `Step 2: Signature verified. Access granted to Guest ID: ${decoded.id}`);
+        req.guest = decoded;
+        next();
+
+    } catch (error) {
+        logger.warn(context, `Access Denied: Token verification failed - ${error.message}`);
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Unauthorized: Invalid or expired session. Please log in again.' 
+        });
+    }
 };
 
 module.exports = {
-    requireAdminKey
+    requireAdminKey,
+    requireGuestToken
 };

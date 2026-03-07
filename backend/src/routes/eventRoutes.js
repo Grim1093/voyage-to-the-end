@@ -34,6 +34,16 @@ router.post('/', requireAdminKey, (req, res) => {
 });
 
 /**
+ * Route: GET /api/events/domain/:hostname
+ * Purpose: Edge Proxy resolving MSaaS custom domains to internal slugs.
+ * ARCHITECT NOTE: Placed strictly above /:eventSlug to prevent hijacking.
+ */
+router.get('/domain/:hostname', (req, res) => {
+    logger.info('EventRoutes', `Incoming GET request from Edge Proxy for domain resolution: ${req.params.hostname}`);
+    eventController.getEventByDomain(req, res);
+});
+
+/**
  * Route: GET /api/events/:eventSlug
  * Purpose: Fetch metadata for a specific event to populate the Event Hub.
  */

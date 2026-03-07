@@ -1,7 +1,10 @@
 const crypto = require('crypto');
+const bcrypt = require('bcrypt'); // [Architecture] Cryptographic salting
+const jwt = require('jsonwebtoken'); // [Architecture] Token minting
 const db = require('../config/db');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
+const { redisClient } = require('../config/cache');
 
 // ARCHITECT NOTE: Upgraded helper to return both ID and Name to support dynamic multi-tenant emails.
 const getEventBySlug = async (slug, context) => {
@@ -16,7 +19,6 @@ const getEventBySlug = async (slug, context) => {
     };
 };
 
-// ARCHITECT NOTE: The New Global Guest Fetcher
 const getGlobalGuests = async (req, res) => {
     const context = 'GuestController - getGlobalGuests';
     logger.info(context, 'Master Admin fetching Global Guest Directory.');
@@ -28,7 +30,6 @@ const getGlobalGuests = async (req, res) => {
         
         const offset = (page - 1) * limit;
 
-        // Uses JSON_AGG to bundle all a guest's events into an array
         const fetchQuery = `
             SELECT 
                 g.id, 
@@ -125,17 +126,19 @@ const registerGuest = async (req, res) => {
             });
         }
 
-        const accessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
-        logger.info(context, `Step 2: Generated secure access code for registration: ${accessCode}`);
+        // [Architecture] Cryptographic hashing of the access code
+        const rawAccessCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        logger.info(context, `Step 2: Generated secure access code for registration. Salting and hashing...`);
+        const hashedAccessCode = await bcrypt.hash(rawAccessCode, 10);
 
         const insertRegQuery = `
             INSERT INTO event_registrations (
                 guest_id, event_id, id_number, id_document_url, dietary_restrictions, current_state, access_code
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7
-            ) RETURNING guest_id, current_state, access_code;
+            ) RETURNING guest_id, current_state;
         `;
-        const regValues = [guestId, eventId, idNumber, idDocumentUrl, dietaryRestrictions, 1, accessCode];
+        const regValues = [guestId, eventId, idNumber, idDocumentUrl, dietaryRestrictions, 1, hashedAccessCode];
 
         const result = await db.query(insertRegQuery, regValues);
         const newRegistration = result.rows[0];
@@ -143,9 +146,8 @@ const registerGuest = async (req, res) => {
         logger.stateChange(newRegistration.guest_id, 0, newRegistration.current_state);
         logger.info(context, `Successfully registered guest: ${newRegistration.guest_id} for event ID: ${eventId}`);
 
-        // ARCHITECT NOTE: Fire-and-forget email delivery. 
-        // We now successfully pass the eventName down to the email service.
-        emailService.sendAccessCode(email, fullName, accessCode, eventName)
+        // We dispatch the RAW code to the email, but only the HASH is in the DB
+        emailService.sendAccessCode(email, fullName, rawAccessCode, eventName)
             .then(() => {
                 logger.info(context, `Background email delivery successful for: ${email}`);
             })
@@ -280,6 +282,21 @@ const updateGuestState = async (req, res) => {
         const updatedGuest = updateResult.rows[0];
 
         logger.stateChange(updatedGuest.id, currentState, updatedGuest.current_state);
+
+        // [Architecture] THE ABYSS: Real-Time State Injection
+        const io = req.app.get('io');
+        if (io) {
+            // Fire a targeted pulse directly to the specific guest's private room
+            io.to(`guest:${guestId}`).emit('state_upgrade', {
+                eventId: eventId,
+                eventSlug: eventSlug,
+                newState: updatedGuest.current_state
+            });
+            logger.info(context, `Step 4: Real-time 'state_upgrade' pulse fired to Abyss room [guest:${guestId}].`);
+        } else {
+            logger.warn(context, `Failure Point Abyss-1: Socket.io engine not found on app instance. Pulse failed.`);
+        }
+
         res.status(200).json({ success: true, data: updatedGuest });
 
     } catch (error) {
@@ -304,20 +321,59 @@ const guestLogin = async (req, res) => {
         }
 
         const query = `
-            SELECT g.id, g.full_name, er.current_state, er.id_document_url, er.access_code, g.phone, er.dietary_restrictions 
+            SELECT g.id, g.email, g.full_name, er.current_state, er.id_document_url, er.access_code, g.phone, er.dietary_restrictions 
             FROM guests g
             JOIN event_registrations er ON g.id = er.guest_id
             WHERE g.email = $1 AND er.event_id = $2;
         `;
         const result = await db.query(query, [email, eventId]);
 
-        if (result.rowCount === 0 || result.rows[0].access_code !== accessCode.trim().toUpperCase()) {
-            logger.warn(context, `Failure Point BB: Login failed for ${email} at event ${eventSlug}`);
+        if (result.rowCount === 0) {
+            logger.warn(context, `Failure Point BB: Identity not found for ${email} at event ${eventSlug}`);
             return res.status(401).json({ success: false, message: 'Invalid email or access code.' });
         }
 
-        const { access_code, ...safeGuestData } = result.rows[0];
-        res.status(200).json({ success: true, data: safeGuestData });
+        const guest = result.rows[0];
+        const inputCode = accessCode.trim().toUpperCase();
+        let isMatch = false;
+
+        if (guest.access_code.startsWith('$2b$') || guest.access_code.startsWith('$2a$')) {
+            isMatch = await bcrypt.compare(inputCode, guest.access_code);
+        } else {
+            isMatch = (inputCode === guest.access_code);
+            if (isMatch) {
+                logger.info(context, `Legacy plaintext code detected for ${email}. Executing background auto-upgrade to bcrypt...`);
+                const newHash = await bcrypt.hash(inputCode, 10);
+                await db.query(`UPDATE event_registrations SET access_code = $1 WHERE guest_id = $2 AND event_id = $3`, [newHash, guest.id, eventId]);
+            }
+        }
+
+        if (!isMatch) {
+            logger.warn(context, `Failure Point BB-2: Cryptographic mismatch for ${email} at event ${eventSlug}`);
+            return res.status(401).json({ success: false, message: 'Invalid email or access code.' });
+        }
+
+        if (!process.env.JWT_SECRET) {
+            logger.error(context, 'CRITICAL FAILURE: JWT_SECRET is missing from the environment.');
+            return res.status(500).json({ success: false, message: 'Internal server error.' });
+        }
+
+        logger.info(context, `Step 3: Identity verified. Minting Guest JWT for Node ${eventId}...`);
+        const tokenPayload = {
+            id: guest.id,
+            email: guest.email,
+            eventId: eventId,
+            role: 'guest'
+        };
+
+        const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+        const { access_code, ...safeGuestData } = guest;
+        res.status(200).json({ 
+            success: true, 
+            token: token,
+            data: safeGuestData 
+        });
 
     } catch (error) {
         logger.error(context, 'Failure Point E7: CRITICAL FAILURE during login.', error);
@@ -405,9 +461,8 @@ const resendAccessCode = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Email is required.' });
         }
 
-        // We use a JOIN to ensure the global guest is actually registered for this specific event
         const query = `
-            SELECT g.full_name, er.access_code 
+            SELECT g.id as guest_id, g.full_name 
             FROM guests g
             JOIN event_registrations er ON g.id = er.guest_id
             WHERE g.email = $1 AND er.event_id = $2;
@@ -419,11 +474,14 @@ const resendAccessCode = async (req, res) => {
             return res.status(404).json({ success: false, message: 'No registration found for this email.' });
         }
 
-        // Safely map the database snake_case to our backend camelCase
-        const { full_name: fullName, access_code: accessCode } = result.rows[0];
+        const { guest_id, full_name: fullName } = result.rows[0];
 
-        // ARCHITECT NOTE: Fire-and-forget email retry using the patched email service
-        emailService.sendAccessCode(email, fullName, accessCode, event.name)
+        const rawNewCode = crypto.randomBytes(3).toString('hex').toUpperCase();
+        const hashedNewCode = await bcrypt.hash(rawNewCode, 10);
+
+        await db.query(`UPDATE event_registrations SET access_code = $1 WHERE guest_id = $2 AND event_id = $3`, [hashedNewCode, guest_id, event.id]);
+
+        emailService.sendAccessCode(email, fullName, rawNewCode, event.name)
             .then(() => {
                 logger.info(context, `Background email delivery successful for resend to: ${email}`);
             })
@@ -431,8 +489,7 @@ const resendAccessCode = async (req, res) => {
                 logger.error(context, `Failure Point R4-B: Background Email Resend Failed to ${email}.`, emailError);
             });
 
-        // Immediately unblock the UI
-        res.status(200).json({ success: true, message: 'Access code resent successfully.' });
+        res.status(200).json({ success: true, message: 'New access code generated and sent successfully.' });
 
     } catch (error) {
         logger.error(context, 'Failure Point R5: CRITICAL FAILURE during resend access code.', error);
@@ -440,6 +497,141 @@ const resendAccessCode = async (req, res) => {
     }
 };
 
+const getEventEchos = async (req, res) => {
+    const context = 'GuestController - getEventEchos';
+    const eventSlug = req.params.eventSlug;
+
+    try {
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+
+        // Fetch up to 150 recent echos, ordered chronologically
+        const query = `
+            SELECT ge.id, ge.guest_id, g.full_name as sender_name, ge.content, ge.created_at
+            FROM global_echos ge
+            JOIN guests g ON ge.guest_id = g.id
+            WHERE ge.event_id = $1
+            ORDER BY ge.created_at ASC
+            LIMIT 150;
+        `;
+        const result = await db.query(query, [event.id]);
+
+        res.status(200).json({ success: true, data: result.rows });
+    } catch (error) {
+        logger.error(context, 'Failure Point G-ECHO: CRITICAL FAILURE fetching echos.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+
+const getPublicGuestDirectory = async (req, res) => {
+    const context = 'GuestController - getPublicGuestDirectory';
+    const eventSlug = req.params.eventSlug;
+
+    try {
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+
+        // [Architecture] SECURITY: Only fetch VERIFIED guests (current_state = 2).
+        // STRICTLY isolate payload to 'id' and 'full_name' to prevent PII leakage.
+        const query = `
+            SELECT g.id, g.full_name
+            FROM guests g
+            JOIN event_registrations er ON g.id = er.guest_id
+            WHERE er.event_id = $1 AND er.current_state = 2
+            ORDER BY g.full_name ASC;
+        `;
+        const result = await db.query(query, [event.id]);
+
+        res.status(200).json({ success: true, data: result.rows });
+    } catch (error) {
+        logger.error(context, 'Failure Point G-DIR: CRITICAL FAILURE fetching public directory.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+const getGuestEchoState = async (req, res) => {
+    const context = 'GuestController - getGuestEchoState';
+    const eventSlug = req.params.eventSlug;
+    // Extracted securely from the JWT by your middleware
+    const guestId = req.guest.id; 
+
+    try {
+        const event = await getEventBySlug(eventSlug, context);
+        if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
+
+        if (!redisClient) {
+            return res.status(200).json({ success: true, data: { inbound: [], outbound: [], connections: [], online: [] } });
+        }
+
+        const eventId = event.id;
+        const pendingKey = `abyss:node:${eventId}:echos_pending`;
+        const acceptedKey = `abyss:node:${eventId}:echos_accepted`;
+        const presenceKey = `abyss:node:${eventId}:online`;
+
+        // Retrieve the current ephemeral state from Valkey
+        const [pendingData, acceptedData, onlineData] = await Promise.all([
+            redisClient.hgetall(pendingKey),
+            redisClient.smembers(acceptedKey),
+            redisClient.smembers(presenceKey)
+        ]);
+
+        const inbound = [];
+        const outbound = [];
+        const connections = [];
+        const online = onlineData || [];
+
+        // Parse pending hashes ("sender_id->target_id")
+        for (const field in pendingData) {
+            const [sender, target] = field.split('->');
+            if (target === guestId) inbound.push(sender);
+            if (sender === guestId) outbound.push(target);
+        }
+
+        // Parse accepted sets (["id1", "id2"])
+        for (const record of acceptedData) {
+            try {
+                const [id1, id2] = JSON.parse(record);
+                if (id1 === guestId) connections.push(id2);
+                else if (id2 === guestId) connections.push(id1);
+            } catch (e) {
+                logger.warn(context, 'Failed to parse an accepted echo record.');
+            }
+        }
+
+        res.status(200).json({
+            success: true,
+            data: { inbound, outbound, connections, online }
+        });
+
+    } catch (error) {
+        logger.error(context, 'Failure Point G-ECHO-STATE: CRITICAL FAILURE fetching ephemeral state.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+const getDirectMessages = async (req, res) => {
+    const context = 'GuestController - getDirectMessages';
+    const targetId = req.params.targetId;
+    const eventId = req.guest.eventId; // From JWT
+    const guestId = req.guest.id;      // From JWT
+
+    try {
+        const query = `
+            SELECT id, sender_id, receiver_id, content, created_at
+            FROM direct_messages
+            WHERE event_id = $1 
+            AND ((sender_id = $2 AND receiver_id = $3) OR (sender_id = $3 AND receiver_id = $2))
+            ORDER BY created_at ASC
+            LIMIT 200;
+        `;
+        const result = await db.query(query, [eventId, guestId, targetId]);
+        res.status(200).json({ success: true, data: result.rows });
+    } catch (error) {
+        logger.error(context, 'CRITICAL FAILURE fetching direct messages.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
 
 module.exports = {
     getGlobalGuests,
@@ -449,5 +641,9 @@ module.exports = {
     guestLogin,
     getGuestStatus,
     getGuestById,
-    resendAccessCode
+    resendAccessCode,
+    getEventEchos,
+    getPublicGuestDirectory,
+    getGuestEchoState,
+    getDirectMessages
 };

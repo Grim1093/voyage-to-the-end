@@ -20,7 +20,14 @@ export default function NewEventDeployment() {
         location: '',
         description: '',
         isPublic: true,
-        images: [] 
+        images: [],
+        customDomain: '',
+        themeConfig: {
+            background: '#09090b',
+            text: '#ffffff',
+            primary: '#8b5cf6',
+            accent: '#3b82f6'
+        }
     });
 
     const [currentImageUrl, setCurrentImageUrl] = useState('');
@@ -29,9 +36,10 @@ export default function NewEventDeployment() {
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
     useEffect(() => {
+        // [Architecture] Upgraded Gatekeeper for JWT Validation
         const validateGatekeeper = () => {
-            const sessionString = sessionStorage.getItem('adminSession');
-            if (!sessionString) {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
                 console.warn(`${context} Failure Point V: Unauthorized deployment attempt.`);
                 router.push('/admin/login');
                 return;
@@ -67,6 +75,17 @@ export default function NewEventDeployment() {
             ...formData,
             [name]: type === 'checkbox' ? checked : value
         });
+    };
+
+    const handleThemeChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            themeConfig: {
+                ...prev.themeConfig,
+                [name]: value
+            }
+        }));
     };
 
     const handleAddImage = (e) => {
@@ -287,13 +306,86 @@ export default function NewEventDeployment() {
                                 />
                             </div>
 
-                            {/* ARCHITECTURE: The Image Node Injector */}
+                            {/* ARCHITECTURE: MSaaS Edge Configuration */}
+                            <div className="space-y-8 pt-8 border-t border-white/[0.03]">
+                                <div className="flex justify-between items-end ml-2 mb-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">MSaaS Edge Configuration</label>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Custom Domain Routing</label>
+                                    <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/30 transition-all shadow-inner">
+                                        <span className="flex items-center pl-6 pr-2 text-zinc-600 text-[10px] font-mono">
+                                            https://
+                                        </span>
+                                        <input 
+                                            type="text" 
+                                            name="customDomain"
+                                            value={formData.customDomain}
+                                            onChange={handleChange}
+                                            placeholder="events.yourbrand.com (Leave blank for default slug)"
+                                            className="w-full bg-transparent text-white px-0 py-4 focus:outline-none text-sm placeholder-zinc-700"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-zinc-600 ml-4">DNS CNAME must be routed to Vercel/Render Edge proxy.</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Tenant Brand Aesthetics</label>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Background</span>
+                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.background}</span>
+                                            </div>
+                                            <input 
+                                                type="color" name="background" value={formData.themeConfig.background} onChange={handleThemeChange} 
+                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
+                                            />
+                                        </div>
+
+                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Text / Typeface</span>
+                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.text}</span>
+                                            </div>
+                                            <input 
+                                                type="color" name="text" value={formData.themeConfig.text} onChange={handleThemeChange} 
+                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
+                                            />
+                                        </div>
+
+                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Core (Primary)</span>
+                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.primary}</span>
+                                            </div>
+                                            <input 
+                                                type="color" name="primary" value={formData.themeConfig.primary} onChange={handleThemeChange} 
+                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
+                                            />
+                                        </div>
+
+                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Portal (Accent)</span>
+                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.accent}</span>
+                                            </div>
+                                            <input 
+                                                type="color" name="accent" value={formData.themeConfig.accent} onChange={handleThemeChange} 
+                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="space-y-4 pt-4 border-t border-white/[0.03]">
                                 <div className="flex justify-between items-end ml-2 mb-2">
                                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Atmospheric Images</label>
                                 </div>
 
-                                {/* ARCHITECTURE: The Landscape Orientation Warning */}
                                 <div className="flex items-start gap-3 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 shadow-[inset_0_0_20px_rgba(245,158,11,0.02)]">
                                     <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -325,7 +417,6 @@ export default function NewEventDeployment() {
                                     </button>
                                 </div>
                                 
-                                {/* The Array Visualizer */}
                                 {formData.images.length > 0 && (
                                     <div className="flex gap-4 overflow-x-auto pb-4 pt-2 custom-scrollbar">
                                         <AnimatePresence>
@@ -335,7 +426,7 @@ export default function NewEventDeployment() {
                                                     initial={{ opacity: 0, scale: 0.8 }}
                                                     animate={{ opacity: 1, scale: 1 }}
                                                     exit={{ opacity: 0, scale: 0.8 }}
-                                                    className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/[0.1] group/img" // Adjusted to 16:9 ratio box
+                                                    className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/[0.1] group/img"
                                                 >
                                                     {/* eslint-disable-next-line @next/next/no-img-element */}
                                                     <img src={url} alt="Attached Node" className="w-full h-full object-cover" />

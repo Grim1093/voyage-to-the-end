@@ -38,6 +38,39 @@ v2NVgg==
     }
 });
 
+// [Architecture] Automated Database Migrations
+const runMigrations = async () => {
+    const context = 'DB-Migration-Tool';
+    const client = await pool.connect();
+    
+    try {
+        logger.info(context, 'Step 1: Checking Abyss ledger architecture...');
+
+        // Create the Global Echos table. 
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS direct_messages (
+                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+                event_id INT REFERENCES events(id) ON DELETE CASCADE,
+                sender_id UUID REFERENCES guests(id) ON DELETE CASCADE,
+                receiver_id UUID REFERENCES guests(id) ON DELETE CASCADE,
+                content TEXT NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        await client.query(`
+            CREATE INDEX IF NOT EXISTS idx_dm_participants ON direct_messages(event_id, sender_id, receiver_id);
+        `);
+
+        logger.info(context, 'Step 2: Abyss ledger architecture verified and ready.');
+
+    } catch (error) {
+        logger.error(context, 'Failure Point DB-MIGRATE: Schema migration failed.', error);
+    } finally {
+        client.release();
+    }
+};
+
 const runSequenceSync = async () => {
     const context = 'DB-Sync-Tool';
     const client = await pool.connect();
@@ -66,6 +99,8 @@ const connectDB = async () => {
         logger.info('Database', 'Successfully connected to PostgreSQL with verified SSL!');
         client.release(); 
 
+        // Execute the automated schema builds
+        await runMigrations();
         await runSequenceSync();
 
     } catch (error) {

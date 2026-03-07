@@ -33,14 +33,14 @@ const HeroSlideshow = ({ images }) => {
     if (!images || images.length === 0) return null;
 
     return (
-        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-[#09090b]">
+        <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-[var(--tenant-bg)]">
             {images.map((src, index) => {
                 const isActive = currentIndex === index;
                 
                 return (
                     <motion.div
                         key={src}
-                        initial={false} // Prevents animation on initial page load
+                        initial={false} 
                         animate={{
                             opacity: isActive ? 1 : 0,
                             scale: isActive ? 1.05 : 1,
@@ -56,7 +56,7 @@ const HeroSlideshow = ({ images }) => {
                             src={src} 
                             alt="Event Atmosphere" 
                             fill
-                            priority={index === 0} // Only force preload the first frame. The browser will background-load the rest automatically.
+                            priority={index === 0} 
                             sizes="100vw"
                             className="object-cover object-center opacity-50" 
                         />
@@ -64,9 +64,9 @@ const HeroSlideshow = ({ images }) => {
                 );
             })}
 
-            {/* Hardware-Accelerated CSS Masks (Elevated z-index to sit above the crossfading images) */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#09090b_120%)] opacity-80 z-20" />
-            <div className="absolute inset-0 bg-gradient-to-b from-[#09090b]/10 via-[#09090b]/60 to-[#09090b] z-20" />
+            {/* Hardware-Accelerated CSS Masks using dynamic tenant background */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,var(--tenant-bg)_120%)] opacity-80 z-20" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--tenant-bg)]/60 to-[var(--tenant-bg)] z-20" />
         </div>
     );
 };
@@ -84,21 +84,17 @@ export default function EventHub() {
         const loadEvent = async () => {
             console.log(`${context} Step 1: Initializing ledger connection for node resolution...`);
             try {
-                console.log(`${context} Step 2: Requesting payload for slug [${eventSlug}]...`);
                 const data = await fetchEventDetails(eventSlug);
-                
-                console.log(`${context} Step 3: Payload received. Validating schema integrity...`, data);
                 if (!data) throw new Error("Null payload returned from API.");
 
                 setEvent(data);
                 setError(null);
-                console.log(`${context} Step 4: Schema validated. Hydrating UI architecture.`);
+                console.log(`${context} Step 2: MSaaS Edge payload hydrated. Theme mapping initiated.`);
             } catch (err) {
                 console.error(`${context} Failure Point Hub-Fetch: Failed to load event details.`, err);
                 setError('Event node not found in the global ledger.');
             } finally {
                 setLoading(false);
-                console.log(`${context} Step 5: Loading state resolved.`);
             }
         };
 
@@ -107,12 +103,8 @@ export default function EventHub() {
 
     const formatEventTime = (start, end) => {
         if (!start && !end) return null;
-        
         const opts = { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' };
-        
-        if (start && end) {
-            return `${new Date(start).toLocaleDateString('en-US', opts)} - ${new Date(end).toLocaleDateString('en-US', opts)}`;
-        }
+        if (start && end) return `${new Date(start).toLocaleDateString('en-US', opts)} - ${new Date(end).toLocaleDateString('en-US', opts)}`;
         if (start) return new Date(start).toLocaleDateString('en-US', opts);
         if (end) return `Until ${new Date(end).toLocaleDateString('en-US', opts)}`;
     };
@@ -147,23 +139,27 @@ export default function EventHub() {
     const formattedDate = formatEventTime(event.start_date, event.end_date);
     const hasImages = event.images && event.images.length > 0;
 
-    // ARCHITECT NOTE: The Auto-Expiry Lock Screen
+    // --- MSAAS THEME ENGINE EXTRACTOR ---
+    const theme = event.theme_config || {};
+    // Extract MSaaS parameters with fallbacks to your original system defaults
+    const cssVariables = {
+        '--tenant-bg': theme.background || '#09090b',
+        '--tenant-text': theme.text || '#ffffff',
+        '--tenant-primary': theme.primary || '#8b5cf6', // The Violet Core
+        '--tenant-accent': theme.accent || '#3b82f6',   // The Blue Portal
+    };
+
     if (event.is_expired) {
         return (
-            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+            <main style={cssVariables} className="min-h-screen bg-[var(--tenant-bg)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
                 {hasImages ? <HeroSlideshow images={event.images} /> : <AmbientAurora />}
-                
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-500/[0.03] rounded-full filter blur-[150px] pointer-events-none z-0"></div>
-                
                 <div className="bg-white/[0.02] border border-white/[0.05] rounded-[40px] p-12 max-w-md text-center backdrop-blur-2xl z-10 shadow-2xl">
-                    <div className="w-16 h-16 bg-white/[0.03] rounded-full flex items-center justify-center mx-auto mb-6 border border-white/[0.08]">
-                        <svg className="w-6 h-6 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
-                    </div>
-                    <h1 className="text-2xl font-medium text-white mb-2 tracking-tight">Event Concluded</h1>
+                    <h1 className="text-2xl font-medium text-[var(--tenant-text)] mb-2 tracking-tight">Event Concluded</h1>
                     <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
-                        The timeline for <span className="text-zinc-300 font-medium">{event.title}</span> has officially elapsed. The registration portal and guest hub are now securely locked.
+                        The timeline for <span className="text-[var(--tenant-text)] font-medium">{event.title}</span> has officially elapsed. The registration portal and guest hub are now securely locked.
                     </p>
-                    <Link href="/" className="inline-flex w-full justify-center py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-[10px] uppercase tracking-widest transition-all">
+                    <Link href="/" className="inline-flex w-full justify-center py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-[var(--tenant-text)] rounded-full font-bold text-[10px] uppercase tracking-widest transition-all">
                         Return to Global Directory
                     </Link>
                 </div>
@@ -182,21 +178,20 @@ export default function EventHub() {
     };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
+        <main style={cssVariables} className="min-h-screen bg-[var(--tenant-bg)] flex flex-col items-center text-zinc-200 relative selection:bg-[var(--tenant-primary)]/30 overflow-hidden transition-colors duration-1000">
 
-            {/* ARCHITECTURE: Graceful Degradation Toggle */}
             {hasImages ? <HeroSlideshow images={event.images} /> : <AmbientAurora />}
             <InteractiveAura />
 
             <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20">
                 <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                    <div className="w-7 h-7 rounded-full bg-[var(--tenant-text)] text-[var(--tenant-bg)] flex items-center justify-center font-bold text-[10px] tracking-tighter">
                         NX
                     </div>
                     <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase drop-shadow-md">Nexus</span>
                 </div>
                 
-                <Link href="/" className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-zinc-300 hover:text-white transition-colors bg-black/20 hover:bg-black/40 border border-white/10 px-4 py-2 rounded-full backdrop-blur-md shadow-lg">
+                <Link href="/" className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-[var(--tenant-text)] hover:opacity-80 transition-opacity bg-black/20 hover:bg-black/40 border border-white/10 px-4 py-2 rounded-full backdrop-blur-md shadow-lg">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     Global Directory
                 </Link>
@@ -210,14 +205,14 @@ export default function EventHub() {
             >
                 <motion.div variants={itemVariant} className="text-center mb-16 space-y-4">
                     <div className="inline-flex items-center gap-2 mb-2 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-zinc-300 text-[10px] font-bold tracking-[0.15em] uppercase shadow-lg">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white/[0.6] animate-pulse"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--tenant-primary)] animate-pulse shadow-[0_0_10px_var(--tenant-primary)]"></span>
                         Active Tenant Portal
                     </div>
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-white leading-tight min-h-[1.2em] drop-shadow-xl">
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-[var(--tenant-text)] leading-tight min-h-[1.2em] drop-shadow-xl">
                         <EncryptedText
                             text={event.title}
                             encryptedClassName="text-zinc-400 font-mono tracking-normal"
-                            revealedClassName="text-white"
+                            revealedClassName="text-[var(--tenant-text)]"
                             revealDelayMs={50} 
                         />
                     </h1>
@@ -229,13 +224,13 @@ export default function EventHub() {
                         <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] text-zinc-300 mt-6 font-medium uppercase tracking-widest">
                             {formattedDate && (
                                 <span className="flex items-center gap-2 px-4 py-2 bg-black/30 rounded-full border border-white/10 shadow-lg backdrop-blur-md">
-                                    <svg className="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <svg className="w-3 h-3 text-[var(--tenant-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     {formattedDate}
                                 </span>
                             )}
                             {event.location && (
                                 <span className="flex items-center gap-2 px-4 py-2 bg-black/30 rounded-full border border-white/10 shadow-lg backdrop-blur-md">
-                                    <svg className="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <svg className="w-3 h-3 text-[var(--tenant-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     {event.location}
                                 </span>
                             )}
@@ -243,38 +238,52 @@ export default function EventHub() {
                     )}
                 </motion.div>
 
-                {/* Free-Floating Navigation Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
                     
-                    {/* Node 1: Register */}
+                    {/* Node 1: Register (Branded with Primary Color) */}
                     <motion.div variants={itemVariant}>
-                        <div className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(139,92,246,0.2)]">
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-violet-400/20 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" />
-                            <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '5s' }} />
+                        <div 
+                            className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1"
+                            style={{ '--hover-shadow': 'var(--tenant-primary)' }} // Passes color to a generic custom var
+                        >
+                            {/* Injected custom hover shadow via style tag to handle dynamic hex colors safely */}
+                            <style jsx>{`
+                                div.group:hover { box-shadow: 0 0 40px color-mix(in srgb, var(--hover-shadow) 20%, transparent); }
+                            `}</style>
+                            
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-primary) 20%, transparent), transparent)' }} />
+                            <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-primary) 10%, transparent)', animationDuration: '5s' }} />
 
                             <div className="w-12 h-12 bg-white/[0.05] rounded-full flex items-center justify-center mb-6 border border-white/[0.1] relative z-10 shadow-inner">
-                                <svg className="w-5 h-5 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                <svg className="w-5 h-5 text-[var(--tenant-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                             </div>
-                            <h2 className="text-xl font-medium text-white mb-3 tracking-tight relative z-10 drop-shadow-md">Register</h2>
+                            <h2 className="text-xl font-medium text-[var(--tenant-text)] mb-3 tracking-tight relative z-10 drop-shadow-md">Register</h2>
                             <p className="text-zinc-400 text-xs mb-8 flex-grow leading-relaxed relative z-10">Secure your clearance for this event. Submit your identity document for ledger verification.</p>
-                            <Link href={`/${eventSlug}/register`} className="w-full py-3 px-4 bg-white text-black rounded-full font-bold text-[11px] uppercase tracking-wider transition-all hover:bg-zinc-200 relative z-10 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95">
+                            <Link href={`/${eventSlug}/register`} className="w-full py-3 px-4 rounded-full font-bold text-[11px] uppercase tracking-wider transition-all relative z-10 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95 text-black hover:opacity-90" style={{ backgroundColor: 'var(--tenant-text)' }}>
                                 Start Registration
                             </Link>
                         </div>
                     </motion.div>
 
-                    {/* Node 2: Portal */}
+                    {/* Node 2: Portal (Branded with Accent Color) */}
                     <motion.div variants={itemVariant}>
-                        <div className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_0_40px_rgba(59,130,246,0.2)]">
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-blue-400/20 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" />
-                            <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '6s' }} />
+                        <div 
+                            className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1"
+                            style={{ '--hover-shadow': 'var(--tenant-accent)' }}
+                        >
+                            <style jsx>{`
+                                div.group:hover { box-shadow: 0 0 40px color-mix(in srgb, var(--hover-shadow) 20%, transparent); }
+                            `}</style>
+                            
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-accent) 20%, transparent), transparent)' }} />
+                            <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-accent) 10%, transparent)', animationDuration: '6s' }} />
 
                             <div className="w-12 h-12 bg-white/[0.05] rounded-full flex items-center justify-center mb-6 border border-white/[0.1] relative z-10 shadow-inner">
-                                <svg className="w-5 h-5 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                <svg className="w-5 h-5 text-[var(--tenant-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             </div>
-                            <h2 className="text-xl font-medium text-white mb-3 tracking-tight relative z-10 drop-shadow-md">Portal</h2>
+                            <h2 className="text-xl font-medium text-[var(--tenant-text)] mb-3 tracking-tight relative z-10 drop-shadow-md">Portal</h2>
                             <p className="text-zinc-400 text-xs mb-8 flex-grow leading-relaxed relative z-10">Already committed to the ledger? View your live verification state and event dashboard.</p>
-                            <Link href={`/${eventSlug}/portal`} className="w-full py-3 px-4 bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.1] rounded-full font-bold text-[11px] uppercase tracking-wider transition-all text-white relative z-10 active:scale-95">
+                            <Link href={`/${eventSlug}/portal`} className="w-full py-3 px-4 bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.1] rounded-full font-bold text-[11px] uppercase tracking-wider transition-all relative z-10 active:scale-95" style={{ color: 'var(--tenant-text)' }}>
                                 Enter Portal
                             </Link>
                         </div>

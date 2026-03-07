@@ -43,16 +43,19 @@ export default function GuestLedgerDashboard() {
             setMessage(error.message);
 
             if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
-                sessionStorage.removeItem('adminSession');
+                // [Architecture] Purge the JWT on unauthorized access
+                localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             }
         }
     }, [currentPage, limit, router, eventSlug, context]);
 
     useEffect(() => {
+        // [Architecture] Upgraded Gatekeeper for Cryptographic JWT Validation
         const validateGatekeeper = () => {
-            const sessionString = sessionStorage.getItem('adminSession');
-            if (!sessionString) {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                console.warn(`${context} Access Denied: Cryptographic token missing. Redirecting to vault.`);
                 router.push('/admin/login');
                 return false;
             }
@@ -62,7 +65,7 @@ export default function GuestLedgerDashboard() {
         if (validateGatekeeper()) {
             fetchLedger(1, 10); 
         }
-    }, [fetchLedger, router]);
+    }, [fetchLedger, router, context]);
 
     const handleStateChange = async (guestId, newState) => {
         try {
@@ -86,7 +89,7 @@ export default function GuestLedgerDashboard() {
     };
 
     const handleLockVault = () => {
-        sessionStorage.removeItem('adminSession');
+        localStorage.removeItem('adminToken'); // [Architecture] Purge JWT on manual lock
         router.push('/admin/login');
     };
 
@@ -120,7 +123,6 @@ export default function GuestLedgerDashboard() {
         { label: '50 Nodes', value: 50 }
     ];
 
-    // ARCHITECTURE: Staggered Deployment Configuration
     const staggerContainer = {
         hidden: { opacity: 0 },
         show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -133,13 +135,11 @@ export default function GuestLedgerDashboard() {
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
             
-            {/* Global Mesh Background & Cursor Aura */}
             <AmbientAurora />
             <InteractiveAura />
 
             <header className="w-full max-w-7xl flex items-center justify-between px-6 py-5 z-20">
                 <div className="flex items-center gap-4">
-                    {/* ARCHITECT NOTE: Corrected the master routing path back to /admin */}
                     <Link href="/admin" className="w-8 h-8 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center hover:bg-white/[0.1] transition-all">
                         <svg className="w-4 h-4 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
@@ -284,7 +284,6 @@ export default function GuestLedgerDashboard() {
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                             className="bg-white/[0.02] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-xl overflow-hidden relative"
                         >
-                            {/* Admin Holographic Cyan Sweep for Modals */}
                             <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
                             
                             <div className="p-10 relative z-10">

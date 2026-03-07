@@ -23,30 +23,20 @@ export default function MasterDashboard() {
     useEffect(() => {
         let inactivityTimer;
 
+        // [Architecture] Upgraded Gatekeeper to hunt for the cryptographic JWT
         const validateGatekeeper = () => {
-            const sessionString = sessionStorage.getItem('adminSession');
-            if (!sessionString) {
+            const token = localStorage.getItem('adminToken');
+            if (!token) {
+                console.warn(`${context} Access Denied: Cryptographic token missing. Redirecting to vault.`);
                 router.push('/admin/login');
                 return false;
             }
-            try {
-                const sessionData = JSON.parse(sessionString);
-                if (!sessionData.key) {
-                    sessionStorage.removeItem('adminSession');
-                    router.push('/admin/login');
-                    return false;
-                }
-                return true;
-            } catch (error) {
-                sessionStorage.removeItem('adminSession');
-                router.push('/admin/login');
-                return false;
-            }
+            return true;
         };
 
         const handleLogout = () => {
             console.log(`${context} Action: Session purged due to inactivity.`);
-            sessionStorage.removeItem('adminSession');
+            localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
             router.push('/admin/login');
         };
 
@@ -82,7 +72,14 @@ export default function MasterDashboard() {
             setEvents(data);
             setStatus('success');
         } catch (error) {
-            setStatus('error');
+            console.error(`${context} Failure fetching tenants:`, error);
+            // If the fetch fails because the token expired, bounce them out
+            if (error.message.includes('401') || error.message.includes('403')) {
+                localStorage.removeItem('adminToken');
+                router.push('/admin/login');
+            } else {
+                setStatus('error');
+            }
         }
     };
 
@@ -93,12 +90,18 @@ export default function MasterDashboard() {
             setGlobalGuests(result.data);
             setStatus('success');
         } catch (error) {
-            setStatus('error');
+            console.error(`${context} Failure fetching global guests:`, error);
+            if (error.message.includes('401') || error.message.includes('403')) {
+                localStorage.removeItem('adminToken');
+                router.push('/admin/login');
+            } else {
+                setStatus('error');
+            }
         }
     };
 
     const handleLockVault = () => {
-        sessionStorage.removeItem('adminSession');
+        localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT on manual lock
         router.push('/admin/login');
     };
 
@@ -115,7 +118,6 @@ export default function MasterDashboard() {
     const activeEvents = events.filter(e => !e.is_expired);
     const previousEvents = events.filter(e => e.is_expired);
 
-    // ARCHITECTURE: Staggered Deployment Configuration
     const staggerContainer = {
         hidden: { opacity: 0 },
         show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -138,7 +140,6 @@ export default function MasterDashboard() {
             <motion.div key={event.slug} variants={itemVariant}>
                 <div className={`relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] group ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
                     
-                    {/* ARCHITECTURE: Admin Holographic Scanner (Cyan) */}
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
 
                     <div className="relative z-10 flex justify-between items-start mb-8">
@@ -180,7 +181,6 @@ export default function MasterDashboard() {
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
             
-            {/* Global Mesh Background & Cursor Aura */}
             <AmbientAurora />
             <InteractiveAura />
 
@@ -214,7 +214,6 @@ export default function MasterDashboard() {
 
             <div className="max-w-7xl w-full z-10 flex flex-col px-6 pb-16 pt-8">
                 
-                {/* Admin Tab Architecture */}
                 <div className="flex space-x-10 mb-12 border-b border-white/[0.05]">
                     <button 
                         onClick={() => setActiveTab('active_events')} 
@@ -315,7 +314,6 @@ export default function MasterDashboard() {
                 </AnimatePresence>
             </div>
 
-            {/* ARCHITECTURE: High-Fidelity Modal Overlay */}
             <AnimatePresence>
                 {selectedGlobalGuest && (
                     <motion.div 
@@ -331,7 +329,6 @@ export default function MasterDashboard() {
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                             className="bg-white/[0.02] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-2xl overflow-hidden relative"
                         >
-                            {/* Modal Sweep */}
                             <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
                             
                             <div className="p-10 relative z-10">
