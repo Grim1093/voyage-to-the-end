@@ -1,6 +1,9 @@
 // --- SANITIZATION PIPELINE ---
-const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-const API_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl.replace(/\/$/, '')}/api`;
+const rawUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api').trim();
+// ARCHITECT NOTE: Bulletproof URL sanitization. Prevents double /api/api appending 
+// if the environment variable accidentally includes trailing slashes (e.g., /api/)
+const cleanBase = rawUrl.replace(/\/+$/, ''); 
+const API_URL = cleanBase.endsWith('/api') ? cleanBase : `${cleanBase}/api`;
 
 export const registerGuest = async (eventSlug, guestData) => {
     const context = `[Frontend API Service - ${eventSlug}]`;
