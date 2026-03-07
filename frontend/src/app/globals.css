@@ -127,9 +127,19 @@
   
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-montserrat), sans-serif;
   }
 
-  /* ARCHITECT NOTE: Injected directly into Tailwind's Base Layer */
+  /* AUTOMATIC GLOBAL FONT MAPPING */
+  h1, h2, h3, .font-heading {
+    font-family: var(--font-bebas), sans-serif;
+    letter-spacing: 0.05em; /* Bebas looks best with slight spacing */
+  }
+
+  h4, h5, h6, .font-subheading {
+    font-family: var(--font-oswald), sans-serif;
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -140,11 +150,11 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: rgba(37, 99, 235, 0.3); /* Soft Royal Blue */
+    background: rgba(37, 99, 235, 0.3); 
     border-radius: 10px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(124, 58, 237, 0.5); /* Electric Violet on hover */
+    background: rgba(124, 58, 237, 0.5); 
   }
 }
