@@ -1,62 +1,66 @@
-// ARCHITECT NOTE: Nodemailer and raw SMTP protocols are completely purged from this architecture.
-// We are pivoting to a direct HTTPS REST API transport (Port 443) to guarantee firewall penetration.
+const nodemailer = require('nodemailer');
+const logger = require('../utils/logger');
 
-console.log('[EmailService] Step 0: Initializing HTTP-based Email API module...');
+// ARCHITECT NOTE: The transport layer has been overhauled to use Nodemailer with Gmail OAuth2.
+// This architecture penetrates Render's data center IP blocks and bypasses "sandbox" restrictions without requiring a custom domain.
+// Strict Requirement: GMAIL_USER, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, and GMAIL_REFRESH_TOKEN must be in the environment variables.
+
+logger.info('[EmailService]', 'Step 0: Initializing OAuth2-based SMTP Email API module...');
+
+const createTransporter = () => {
+    return nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            type: 'OAuth2',
+            user: process.env.GMAIL_USER,
+            clientId: process.env.GMAIL_CLIENT_ID,
+            clientSecret: process.env.GMAIL_CLIENT_SECRET,
+            refreshToken: process.env.GMAIL_REFRESH_TOKEN
+        }
+    });
+};
 
 // --- 1. ACCESS CODE PIPELINE ---
 const sendAccessCode = async (email, fullName, accessCode, eventName) => {
     const context = `[EmailService - Access - ${eventName}]`;
-    console.log(`${context} Step 1: Preparing HTTP email payload for ${email}`);
+    logger.info(context, `Step 1: Preparing OAuth2 email payload for ${email}`);
 
     try {
-        if (!process.env.RESEND_API_KEY) {
-            console.error(`${context} CRITICAL FAILURE: RESEND_API_KEY environment variable is missing.`);
-            throw new Error('Email API key not configured in the Control Plane.');
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_REFRESH_TOKEN) {
+            logger.error(context, 'Failure Point E1: Missing OAuth2 environment variables.');
+            throw new Error('Email OAuth2 credentials not configured in the Control Plane.');
         }
 
-        console.log(`${context} Step 2: Constructing JSON payload for HTTP dispatch...`);
+        logger.info(context, 'Step 2: Constructing HTML payload...');
         
-        const payload = {
-            from: process.env.EMAIL_FROM || 'onboarding@resend.dev', 
-            to: [email],
-            subject: `Your Access Code for ${eventName}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                    <h2>Welcome to ${eventName}, ${fullName}!</h2>
-                    <p>Your registration is confirmed. To track your verification status and access your dashboard for <strong>${eventName}</strong>, use the secure code below:</p>
-                    <div style="background-color: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
-                        <h1 style="letter-spacing: 5px; color: #2563eb; margin: 0;">${accessCode}</h1>
-                    </div>
-                    <p>Keep this code safe. Do not share it with anyone.</p>
-                    <br/>
-                    <p>Best regards,<br/><strong>The ${eventName} Administration Team</strong></p>
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                <h2>Welcome to ${eventName}, ${fullName}!</h2>
+                <p>Your registration is confirmed. To track your verification status and access your dashboard for <strong>${eventName}</strong>, use the secure code below:</p>
+                <div style="background-color: #f4f4f4; padding: 15px; text-align: center; border-radius: 5px; margin: 20px 0;">
+                    <h1 style="letter-spacing: 5px; color: #2563eb; margin: 0;">${accessCode}</h1>
                 </div>
-            `
-        };
+                <p>Keep this code safe. Do not share it with anyone.</p>
+                <br/>
+                <p>Best regards,<br/><strong>The ${eventName} Administration Team</strong></p>
+            </div>
+        `;
 
-        console.log(`${context} Step 3: Initiating secure HTTPS dispatch to Resend API (Port 443)...`);
+        logger.info(context, 'Step 3: Initiating secure OAuth2 SMTP dispatch...');
 
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+        const transporter = createTransporter();
+        const info = await transporter.sendMail({
+            from: process.env.GMAIL_USER,
+            to: email,
+            subject: `Your Access Code for ${eventName}`,
+            html: htmlContent
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error(`${context} Failure Point Y: External API rejected the payload. Reason:`, data);
-            throw new Error(data.message || 'Email API strictly rejected the HTTP request.');
-        }
-        
-        console.log(`${context} Step 4: SUCCESS. HTTP Transporter verified delivery. Provider Trace ID: ${data.id}`);
+        logger.info(context, `Step 4: SUCCESS. Transporter verified delivery. Message ID: ${info.messageId}`);
         return true;
 
     } catch (error) {
-        console.error(`${context} CRITICAL FAILURE (Failure Point Z): Network or API dispatch pipeline shattered.`, error.message);
+        logger.error(context, `Failure Point E2: Network or SMTP dispatch pipeline shattered. Details: ${error.message}`);
         throw error; 
     }
 };
@@ -64,15 +68,14 @@ const sendAccessCode = async (email, fullName, accessCode, eventName) => {
 // --- 2. THE ABYSS DISSOLVE PIPELINE ---
 const sendMeshExport = async (targetEmail, targetName, eventName, connections) => {
     const context = `[EmailService - Abyss Export - ${eventName}]`;
-    console.log(`${context} Step 1: Preparing Mesh Export payload for ${targetEmail} with ${connections.length} echos.`);
+    logger.info(context, `Step 1: Preparing Mesh Export payload for ${targetEmail} with ${connections.length} echos.`);
 
     try {
-        if (!process.env.RESEND_API_KEY) {
-            console.error(`${context} CRITICAL FAILURE: RESEND_API_KEY environment variable is missing.`);
-            throw new Error('Email API key not configured.');
+        if (!process.env.GMAIL_USER || !process.env.GMAIL_REFRESH_TOKEN) {
+            logger.error(context, 'Failure Point E3: Missing OAuth2 environment variables.');
+            throw new Error('Email OAuth2 credentials not configured.');
         }
 
-        // Generate dynamic HTML for the connections list
         let connectionsHtml = '';
         if (connections.length === 0) {
             connectionsHtml = '<p>You did not finalize any echos during this event.</p>';
@@ -99,55 +102,42 @@ const sendMeshExport = async (targetEmail, targetName, eventName, connections) =
             `;
         }
 
-        console.log(`${context} Step 2: Dynamic HTML matrix generated. Constructing final JSON payload...`);
+        logger.info(context, 'Step 2: Dynamic HTML matrix generated. Constructing final transport payload...');
 
-        const payload = {
-            from: process.env.EMAIL_FROM || 'onboarding@resend.dev', 
-            to: [targetEmail],
-            subject: `Your Connections from ${eventName} - The Abyss`,
-            html: `
-                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
-                    <div style="text-align: center; margin-bottom: 30px;">
-                        <h1 style="color: #111827; margin: 0;">${eventName}</h1>
-                        <p style="color: #6b7280; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">The Abyss Dissolved</p>
-                    </div>
-                    
-                    <p>Hello ${targetName},</p>
-                    <p>The event has concluded, and the ephemeral network has been permanently dissolved. Below is the finalized graph of the echos you secured during your session.</p>
-                    
-                    ${connectionsHtml}
-                    
-                    <br/>
-                    <p style="color: #6b7280; font-size: 12px; text-align: center; margin-top: 40px;">
-                        This is an automated transmission from the Nexus Control Plane.
-                    </p>
+        const htmlContent = `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <h1 style="color: #111827; margin: 0;">${eventName}</h1>
+                    <p style="color: #6b7280; font-size: 14px; text-transform: uppercase; letter-spacing: 2px;">The Abyss Dissolved</p>
                 </div>
-            `
-        };
+                
+                <p>Hello ${targetName},</p>
+                <p>The event has concluded, and the ephemeral network has been permanently dissolved. Below is the finalized graph of the echos you secured during your session.</p>
+                
+                ${connectionsHtml}
+                
+                <br/>
+                <p style="color: #6b7280; font-size: 12px; text-align: center; margin-top: 40px;">
+                    This is an automated transmission from the Nexus Control Plane.
+                </p>
+            </div>
+        `;
 
-        console.log(`${context} Step 3: Initiating HTTPS dispatch to Resend...`);
+        logger.info(context, 'Step 3: Initiating OAuth2 SMTP dispatch for Mesh Export...');
 
-        const response = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+        const transporter = createTransporter();
+        const info = await transporter.sendMail({
+            from: process.env.GMAIL_USER,
+            to: targetEmail,
+            subject: `Your Connections from ${eventName} - The Abyss`,
+            html: htmlContent
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error(`${context} Failure Point Y: External API rejected the Mesh Export. Reason:`, data);
-            throw new Error(data.message || 'Email API rejected the HTTP request.');
-        }
-        
-        console.log(`${context} Step 4: SUCCESS. Abyss Export delivered to ${targetEmail}. Trace ID: ${data.id}`);
+        logger.info(context, `Step 4: SUCCESS. Abyss Export delivered to ${targetEmail}. Message ID: ${info.messageId}`);
         return true;
 
     } catch (error) {
-        console.error(`${context} CRITICAL FAILURE (Failure Point Z): Network failure on Mesh Export.`, error.message);
+        logger.error(context, `Failure Point E4: Network failure on Mesh Export. Details: ${error.message}`);
         throw error; 
     }
 };
