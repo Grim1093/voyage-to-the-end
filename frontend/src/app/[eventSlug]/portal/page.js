@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link'; 
 import { motion } from 'framer-motion';
@@ -14,6 +14,10 @@ export default function GuestPortalLogin() {
     const context = `[GuestPortalLogin Component - ${eventSlug}]`;
     
     const router = useRouter();
+
+    useEffect(() => {
+        console.log(`${context} Component mounted - Royal Blue / Electric Violet theme active`);
+    }, [context]);
     
     const [formData, setFormData] = useState({ email: '', accessCode: '' });
     const [status, setStatus] = useState('idle'); // idle | loading | error | success
@@ -84,7 +88,7 @@ export default function GuestPortalLogin() {
 
     return (
         // ARCHITECT NOTE: Softened dark mode background mapped to global Luma aesthetic
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 sm:p-6 text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 sm:p-6 text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden">
             
             {/* Global Mesh Background & Cursor Aura */}
             <AmbientAurora />
@@ -106,10 +110,10 @@ export default function GuestPortalLogin() {
                 </div>
 
                 {/* Ultra-Soft Frosted Container with Holographic Sweep */}
-                <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl rounded-[32px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] border border-white/[0.05] p-8 sm:p-10 transition-all duration-500 hover:shadow-[0_0_40px_rgba(99,102,241,0.1)]">
+                <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl rounded-[32px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] border border-white/[0.05] p-8 sm:p-10 transition-all duration-500 hover:shadow-[0_0_40px_rgba(37,99,235,0.15)]">
                     
                     {/* ARCHITECTURE: Hardware-Accelerated Holographic Sweep */}
-                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-indigo-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/15 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
                     <div className="relative z-10">
                         <div className="text-center mb-10">
@@ -131,8 +135,8 @@ export default function GuestPortalLogin() {
                             )}
 
                             {status === 'success' && (
-                                <div className="flex items-start p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl text-xs text-emerald-400/80 shadow-sm transition-all tracking-wide">
-                                    <svg className="w-4 h-4 text-emerald-500/80 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                <div className="flex items-start p-4 bg-[#7C3AED]/5 border border-[#7C3AED]/10 rounded-2xl text-xs text-[#7C3AED]/80 shadow-sm transition-all tracking-wide">
+                                    <svg className="w-4 h-4 text-[#7C3AED]/80 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     {message}
                                 </div>
                             )}
@@ -144,7 +148,7 @@ export default function GuestPortalLogin() {
                                     name="email"
                                     value={formData.email} 
                                     onChange={handleChange} 
-                                    className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm" 
+                                    className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm" 
                                     placeholder="guest@enterprise.com" 
                                     disabled={status === 'loading'}
                                 />
@@ -157,7 +161,7 @@ export default function GuestPortalLogin() {
                                     name="accessCode"
                                     value={formData.accessCode} 
                                     onChange={handleChange} 
-                                    className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 uppercase tracking-[0.3em] font-mono text-sm" 
+                                    className="w-full px-5 py-3.5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.05] rounded-full focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 outline-none transition-all duration-300 shadow-inner hover:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 uppercase tracking-[0.3em] font-mono text-sm" 
                                     placeholder="A1B2C3" 
                                     maxLength={6}
                                     disabled={status === 'loading'}

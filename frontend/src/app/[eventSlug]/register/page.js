@@ -3,6 +3,7 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import { useEffect } from 'react';
 import GuestIntakeForm from '../../../components/GuestIntakeForm';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
@@ -12,7 +13,9 @@ export default function RegisterPage() {
     const eventSlug = params.eventSlug;
     const context = `[RegisterPage Component - ${eventSlug}]`;
 
-    console.log(`${context} Rendering registration wrapper for event: ${eventSlug}`);
+    useEffect(() => {
+        console.log(`${context} Component mounted - Royal Blue / Electric Violet theme active`);
+    }, [context]);
 
     // Orchestration Configuration
     const staggerContainer = {
@@ -26,7 +29,7 @@ export default function RegisterPage() {
     };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8 text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center py-10 px-4 sm:px-6 lg:px-8 text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden">
             
             {/* Global Mesh Background & Cursor Aura */}
             <AmbientAurora />
@@ -50,7 +53,7 @@ export default function RegisterPage() {
                 {/* Minimalist Page Header */}
                 <motion.div variants={itemVariant} className="text-center mb-10 space-y-4">
                     <div className="inline-flex items-center gap-2 mb-2 px-3 py-1 rounded-full bg-white/[0.03] border border-white/[0.08] text-zinc-400 text-[11px] font-medium tracking-[0.15em] uppercase backdrop-blur-md">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#7C3AED]/80 shadow-[0_0_8px_rgba(124,58,237,0.8)] animate-pulse"></span>
                         Secure Registration
                     </div>
                     <h1 className="text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight text-white capitalize leading-tight">
@@ -61,12 +64,12 @@ export default function RegisterPage() {
                     </p>
                 </motion.div>
 
-                {/* Form Wrapper with Ultra-Soft Frosted Glass & Emerald Holographic Sweep */}
+                {/* Form Wrapper with Ultra-Soft Frosted Glass & Royal Blue Holographic Sweep */}
                 <motion.div variants={itemVariant} className="w-full">
-                    <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl rounded-[32px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] border border-white/[0.05] p-4 sm:p-8 transition-all duration-500 hover:shadow-[0_0_40px_rgba(16,185,129,0.08)]">
+                    <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl rounded-[32px] shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] border border-white/[0.05] p-4 sm:p-8 transition-all duration-500 hover:shadow-[0_0_40px_rgba(37,99,235,0.15)]">
                         
                         {/* ARCHITECTURE: Hardware-Accelerated Holographic Sweep */}
-                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-emerald-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/15 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
                         <div className="relative z-10">
                             {/* ARCHITECT NOTE: We pass the eventSlug down as a prop so the form knows where to submit */}

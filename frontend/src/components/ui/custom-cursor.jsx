@@ -21,6 +21,9 @@ export function CustomCursor() {
     const targetY = useRef(-100);
 
     useEffect(() => {
+        // Log to track step initialization
+        console.log("[CustomCursor] Initialized with Royal Blue and Deep Midnight hover states.");
+
         // Strict Coarse Pointer detection (Disables custom cursor on mobile/touch)
         if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) {
             setIsTouchDevice(true);
@@ -79,7 +82,7 @@ export function CustomCursor() {
             {/* Global Override: Hides default OS cursor only when component is active */}
             <style dangerouslySetInnerHTML={{__html: `* { cursor: none !important; }`}} />
             
-            {/* LAYER 1: The Immediate Anchor Dot */}
+            {/* LAYER 1: The Immediate Anchor Dot (Royal Blue) */}
             <motion.div
                 className="fixed top-0 left-0 pointer-events-none z-[9999]"
                 style={{
@@ -91,7 +94,7 @@ export function CustomCursor() {
                 }}
             >
                 <motion.div 
-                    className="w-2 h-2 bg-white rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                    className="w-2 h-2 bg-[#2563EB] rounded-full shadow-[0_0_10px_rgba(37,99,235,0.5)]"
                     animate={{
                         scale: isHovering ? 0 : 1,
                         opacity: isVisible ? 1 : 0
@@ -101,7 +104,7 @@ export function CustomCursor() {
                 />
             </motion.div>
 
-            {/* LAYER 2: The Liquid Trailing Ring (Driven by LERP Engine) */}
+            {/* LAYER 2: The Liquid Trailing Ring (Deep Midnight Hover Blend) */}
             <motion.div
                 className="fixed top-0 left-0 pointer-events-none z-[9998]"
                 style={{
@@ -116,8 +119,8 @@ export function CustomCursor() {
                     className="w-8 h-8 border rounded-full backdrop-blur-[1px]"
                     animate={{
                         scale: isHovering ? 1.8 : 1,
-                        backgroundColor: isHovering ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0)",
-                        borderColor: isHovering ? "rgba(255,255,255,0)" : "rgba(255,255,255,0.4)",
+                        backgroundColor: isHovering ? "rgba(15,23,42,0.8)" : "rgba(15,23,42,0)", // Deep midnight fill on hover
+                        borderColor: isHovering ? "rgba(15,23,42,0)" : "rgba(37,99,235,0.4)", // Royal blue ring at rest
                         opacity: isVisible ? 1 : 0
                     }}
                     transition={{ duration: 0.15, ease: "easeOut" }}

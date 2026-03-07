@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -19,6 +19,10 @@ export default function MasterAdminLogin() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        console.log(`${context} Component mounted - Royal Blue / Electric Violet theme active`);
+    }, []);
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -47,7 +51,7 @@ export default function MasterAdminLogin() {
     };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-6 text-zinc-200 overflow-hidden relative selection:bg-cyan-500/30">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-6 text-zinc-200 overflow-hidden relative selection:bg-[#2563EB]/30">
             
             {/* Global Mesh Background & Cursor Aura */}
             <AmbientAurora />
@@ -68,10 +72,10 @@ export default function MasterAdminLogin() {
                 </div>
 
                 {/* Ultra-Soft Frosted Admin Container */}
-                <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[32px] p-10 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] transition-all duration-500 hover:shadow-[0_0_40px_rgba(34,211,238,0.1)]">
+                <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[32px] p-10 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] transition-all duration-500 hover:shadow-[0_0_40px_rgba(37,99,235,0.15)]">
                     
-                    {/* ARCHITECTURE: Hardware-Accelerated Holographic Sweep (Admin Cyan) */}
-                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+                    {/* ARCHITECTURE: Hardware-Accelerated Holographic Sweep (Royal Blue) */}
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/15 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
                     <div className="relative z-10">
                         <div className="flex justify-center mb-8">
@@ -107,7 +111,7 @@ export default function MasterAdminLogin() {
                                     value={adminKey}
                                     onChange={(e) => setAdminKey(e.target.value)}
                                     placeholder="••••••••••••"
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-center tracking-[0.4em] font-mono text-sm shadow-inner placeholder-zinc-700"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-[#7C3AED]/50 focus:border-[#7C3AED]/30 transition-all text-center tracking-[0.4em] font-mono text-sm shadow-inner placeholder-zinc-700"
                                 />
                             </div>
 

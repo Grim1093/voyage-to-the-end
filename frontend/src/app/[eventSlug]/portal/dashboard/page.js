@@ -18,6 +18,7 @@ export default function GuestDashboard() {
     const [guest, setGuest] = useState(null);
 
     useEffect(() => {
+        console.log(`${context} Component mounted - Royal Blue / Electric Violet theme active`);
         console.log(`${context} Step 1: Dashboard mounted. Checking for secure session data.`);
         const sessionData = sessionStorage.getItem('guestData');
         
@@ -103,7 +104,7 @@ export default function GuestDashboard() {
     };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden">
             
             <AmbientAurora />
             <InteractiveAura />
@@ -149,13 +150,13 @@ export default function GuestDashboard() {
                 {/* Free-Floating Info Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-12">
                     
-                    {/* Identity Credentials Card (Indigo Holographic) */}
+                    {/* Identity Credentials Card (Royal Blue Holographic) */}
                     <motion.div variants={itemVariant}>
-                        <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)]">
+                        <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(37,99,235,0.15)]">
                             {/* Holographic Beam */}
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-indigo-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/15 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
                             {/* Ambient Pulse Aura */}
-                            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '6s' }} />
+                            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#2563EB]/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '6s' }} />
 
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-6">
@@ -181,13 +182,13 @@ export default function GuestDashboard() {
                         </div>
                     </motion.div>
 
-                    {/* Profile Details Card (Violet Holographic) */}
+                    {/* Profile Details Card (Electric Violet Holographic) */}
                     <motion.div variants={itemVariant}>
-                        <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)]">
+                        <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(124,58,237,0.15)]">
                             {/* Holographic Beam */}
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-violet-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#7C3AED]/15 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
                             {/* Ambient Pulse Aura */}
-                            <div className="absolute -top-32 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '7s' }} />
+                            <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#7C3AED]/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '7s' }} />
 
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-6">
@@ -212,11 +213,11 @@ export default function GuestDashboard() {
 
                 </div>
 
-                {/* Event Itinerary Container (Fuchsia Holographic Sweep) */}
+                {/* Event Itinerary Container (Deep Midnight Fade/Blend with Violet Highlight) */}
                 <motion.div variants={itemVariant} className="w-full">
-                    <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[32px] transition-all duration-500 hover:shadow-[0_0_30px_rgba(217,70,239,0.08)]">
+                    <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[32px] transition-all duration-500 hover:shadow-[0_0_30px_rgba(15,23,42,0.5)]">
                         {/* Holographic Beam */}
-                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-fuchsia-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#0F172A]/80 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
                         
                         <div className="relative z-10">
                             <div className="px-8 py-5 border-b border-white/[0.03]">
@@ -226,7 +227,7 @@ export default function GuestDashboard() {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Selected Hub</span>
-                                        <p className="text-sm text-zinc-100 font-medium capitalize">{eventSlug.replace(/-/g, ' ')}</p>
+                                        <p className="text-sm text-zinc-100 font-medium capitalize group-hover:text-[#7C3AED] transition-colors">{eventSlug.replace(/-/g, ' ')}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Schedule</span>

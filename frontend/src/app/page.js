@@ -12,26 +12,32 @@ const EncryptedText = dynamic(
     { ssr: false }
 );
 
-// ARCHITECTURE: Global Ambient Aurora Background
-const AmbientAurora = () => (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <motion.div
-            animate={{ x: [0, 100, -50, 0], y: [0, -50, 100, 0], scale: [1, 1.1, 0.9, 1] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="absolute -top-[20%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-indigo-500/10 blur-[120px]"
-        />
-        <motion.div
-            animate={{ x: [0, -100, 50, 0], y: [0, 100, -50, 0], scale: [1, 0.9, 1.1, 1] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-[40%] -right-[10%] w-[40vw] h-[40vw] rounded-full bg-violet-500/10 blur-[120px]"
-        />
-        <motion.div
-            animate={{ x: [0, 50, -100, 0], y: [0, -100, 50, 0], scale: [1, 1.2, 0.8, 1] }}
-            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-            className="absolute -bottom-[20%] left-[20%] w-[60vw] h-[60vw] rounded-full bg-fuchsia-500/10 blur-[120px]"
-        />
-    </div>
-);
+// ARCHITECTURE: Global Ambient Aurora Background (Inline Version)
+const AmbientAurora = () => {
+    useEffect(() => {
+        console.log("[page.js - AmbientAurora] Inline Aurora mounted with Royal Blue / Electric Violet / Deep Midnight theme");
+    }, []);
+
+    return (
+        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+            <motion.div
+                animate={{ x: [0, 100, -50, 0], y: [0, -50, 100, 0], scale: [1, 1.1, 0.9, 1] }}
+                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                className="absolute -top-[20%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-[#2563EB]/15 blur-[120px]"
+            />
+            <motion.div
+                animate={{ x: [0, -100, 50, 0], y: [0, 100, -50, 0], scale: [1, 0.9, 1.1, 1] }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute top-[40%] -right-[10%] w-[40vw] h-[40vw] rounded-full bg-[#7C3AED]/15 blur-[120px]"
+            />
+            <motion.div
+                animate={{ x: [0, 50, -100, 0], y: [0, -100, 50, 0], scale: [1, 1.2, 0.8, 1] }}
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                className="absolute -bottom-[20%] left-[20%] w-[60vw] h-[60vw] rounded-full bg-[#0F172A]/60 blur-[120px]"
+            />
+        </div>
+    );
+};
 
 // ARCHITECTURE: Cinematic Image Slideshow Component (Desynchronized & Optimized)
 const EventSlideshow = ({ images }) => {
@@ -104,7 +110,7 @@ export default function GlobalPlatformHub() {
 
     useEffect(() => {
         const loadEvents = async () => {
-            console.log(`${context} Step 1: Initializing ledger connection for event resolution...`);
+            console.log(`${context} Step 1: Initializing ledger connection for event resolution... Theme config integrated.`);
             try {
                 const fetchedEvents = await fetchPublicEvents();
                 setEvents(fetchedEvents);
@@ -135,21 +141,23 @@ export default function GlobalPlatformHub() {
         });
     };
 
+    // ARCHITECTURE: Updated Theme Nodes (Royal Blue, Electric Violet, Deep Midnight)
     const nodeConfigs = [
-        { pos: '-top-32 -right-32', bg: 'bg-indigo-500/15', duration: '7s', holo: 'via-indigo-400/20', shadow: 'hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]' },
-        { pos: '-bottom-32 -left-32', bg: 'bg-violet-500/10', duration: '5s', holo: 'via-violet-400/20', shadow: 'hover:shadow-[0_0_30px_rgba(139,92,246,0.15)]' },
-        { pos: '-top-32 -left-32', bg: 'bg-fuchsia-500/10', duration: '8s', holo: 'via-fuchsia-400/20', shadow: 'hover:shadow-[0_0_30px_rgba(217,70,239,0.15)]' },
-        { pos: '-bottom-32 -right-32', bg: 'bg-blue-500/10', duration: '6s', holo: 'via-blue-400/20', shadow: 'hover:shadow-[0_0_30px_rgba(59,130,246,0.15)]' },
-        { pos: 'top-0 right-1/4', bg: 'bg-indigo-500/10', duration: '9s', holo: 'via-indigo-400/20', shadow: 'hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]' }
+        { pos: '-top-32 -right-32', bg: 'bg-[#2563EB]/15', duration: '7s', holo: 'via-[#2563EB]/20', shadow: 'hover:shadow-[0_0_30px_rgba(37,99,235,0.15)]' },
+        { pos: '-bottom-32 -left-32', bg: 'bg-[#7C3AED]/15', duration: '5s', holo: 'via-[#7C3AED]/20', shadow: 'hover:shadow-[0_0_30px_rgba(124,58,237,0.15)]' },
+        { pos: '-top-32 -left-32', bg: 'bg-[#0F172A]/50', duration: '8s', holo: 'via-[#0F172A]/40', shadow: 'hover:shadow-[0_0_30px_rgba(15,23,42,0.4)]' },
+        { pos: '-bottom-32 -right-32', bg: 'bg-[#2563EB]/10', duration: '6s', holo: 'via-[#2563EB]/20', shadow: 'hover:shadow-[0_0_30px_rgba(37,99,235,0.15)]' },
+        { pos: 'top-0 right-1/4', bg: 'bg-[#7C3AED]/10', duration: '9s', holo: 'via-[#7C3AED]/20', shadow: 'hover:shadow-[0_0_30px_rgba(124,58,237,0.15)]' }
     ];
 
+    // ARCHITECTURE: Updated Ledger Sweeps
     const ledgerColors = [
-        { border: 'hover:border-l-indigo-500', sweep: 'from-indigo-500/[0.05]', text: 'group-hover:text-indigo-400' },
-        { border: 'hover:border-l-violet-500', sweep: 'from-violet-500/[0.05]', text: 'group-hover:text-violet-400' },
-        { border: 'hover:border-l-fuchsia-500', sweep: 'from-fuchsia-500/[0.05]', text: 'group-hover:text-fuchsia-400' },
-        { border: 'hover:border-l-blue-500', sweep: 'from-blue-500/[0.05]', text: 'group-hover:text-blue-400' },
-        { border: 'hover:border-l-emerald-500', sweep: 'from-emerald-500/[0.05]', text: 'group-hover:text-emerald-400' },
-        { border: 'hover:border-l-cyan-500', sweep: 'from-cyan-500/[0.05]', text: 'group-hover:text-cyan-400' },
+        { border: 'hover:border-l-[#2563EB]', sweep: 'from-[#2563EB]/[0.05]', text: 'group-hover:text-[#2563EB]' },
+        { border: 'hover:border-l-[#7C3AED]', sweep: 'from-[#7C3AED]/[0.05]', text: 'group-hover:text-[#7C3AED]' },
+        { border: 'hover:border-l-[#0F172A]', sweep: 'from-[#0F172A]/[0.2]', text: 'group-hover:text-white' }, // Text left white for visibility against midnight background
+        { border: 'hover:border-l-[#2563EB]', sweep: 'from-[#2563EB]/[0.05]', text: 'group-hover:text-[#2563EB]' },
+        { border: 'hover:border-l-[#7C3AED]', sweep: 'from-[#7C3AED]/[0.05]', text: 'group-hover:text-[#7C3AED]' },
+        { border: 'hover:border-l-[#0F172A]', sweep: 'from-[#0F172A]/[0.2]', text: 'group-hover:text-white' },
     ];
 
     const staggerContainer = {
@@ -158,7 +166,7 @@ export default function GlobalPlatformHub() {
     };
 
     return (
-        <main className="min-h-screen flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden bg-[#09090b]">
+        <main className="min-h-screen flex flex-col items-center text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden bg-[#09090b]">
             
             <AmbientAurora />
             
@@ -173,7 +181,7 @@ export default function GlobalPlatformHub() {
                 </div>
 
                 <div className="flex-1 max-w-md mx-6 relative group">
-                    <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#2563EB] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input 
@@ -181,7 +189,7 @@ export default function GlobalPlatformHub() {
                         placeholder="Search active tenants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] focus:border-indigo-500/30 focus:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm rounded-full py-3 pl-12 pr-6 outline-none transition-all duration-300 backdrop-blur-md"
+                        className="w-full bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] focus:border-[#2563EB]/30 focus:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm rounded-full py-3 pl-12 pr-6 outline-none transition-all duration-300 backdrop-blur-md"
                     />
                 </div>
 

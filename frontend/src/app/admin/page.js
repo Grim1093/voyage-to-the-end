@@ -21,6 +21,9 @@ export default function MasterDashboard() {
     const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 
     useEffect(() => {
+        // Step log tracking initialization and theme confirmation
+        console.log(`${context} Component mounted - Royal Blue / Electric Violet theme active`);
+        
         let inactivityTimer;
 
         const validateGatekeeper = () => {
@@ -105,7 +108,7 @@ export default function MasterDashboard() {
     const renderStateBadge = (state) => {
         switch(state) {
             case 0: return <span className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-zinc-600"></span> Invited</span>;
-            case 1: return <span className="flex items-center gap-1.5 text-indigo-400/80 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-indigo-500 animate-pulse"></span> Review</span>;
+            case 1: return <span className="flex items-center gap-1.5 text-[#7C3AED]/80 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-[#7C3AED] animate-pulse"></span> Review</span>;
             case 2: return <span className="flex items-center gap-1.5 text-zinc-300 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]"></span> Verified</span>;
             case -1: return <span className="flex items-center gap-1.5 text-rose-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-rose-500"></span> Action</span>;
             default: return <span className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest">N/A</span>;
@@ -136,17 +139,17 @@ export default function MasterDashboard() {
         
         return eventList.map((event) => (
             <motion.div key={event.slug} variants={itemVariant}>
-                <div className={`relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] group ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
+                <div className={`relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(37,99,235,0.15)] group ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
                     
-                    {/* ARCHITECTURE: Admin Holographic Scanner (Cyan) */}
-                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
+                    {/* ARCHITECTURE: Admin Holographic Scanner (Royal Blue) */}
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/15 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
 
                     <div className="relative z-10 flex justify-between items-start mb-8">
                         <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08] text-sm font-light text-zinc-300 shadow-inner">
                             {event.slug.charAt(0).toUpperCase()}
                         </div>
-                        <span className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
+                        <span className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-[#7C3AED]/80'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-[#7C3AED]'}`}></span>
                             {event.is_expired ? 'Archived' : event.is_public ? 'Public' : 'Private'}
                         </span>
                     </div>
@@ -157,10 +160,10 @@ export default function MasterDashboard() {
                             href={`/${event.slug}`} 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-cyan-400 transition-colors flex items-center gap-2 w-fit group/link"
+                            className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-[#2563EB] transition-colors flex items-center gap-2 w-fit group/link"
                         >
                             /{event.slug}
-                            <svg className="w-3 h-3 opacity-0 -translate-x-2 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            <svg className="w-3 h-3 opacity-0 -translate-x-2 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         </a>
                     </div>
                     
@@ -178,7 +181,7 @@ export default function MasterDashboard() {
     };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden">
             
             {/* Global Mesh Background & Cursor Aura */}
             <AmbientAurora />
@@ -331,8 +334,8 @@ export default function MasterDashboard() {
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                             className="bg-white/[0.02] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-2xl overflow-hidden relative"
                         >
-                            {/* Modal Sweep */}
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
+                            {/* Modal Sweep (Royal Blue) */}
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/10 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
                             
                             <div className="p-10 relative z-10">
                                 <div className="flex justify-between items-start mb-10">
@@ -372,7 +375,7 @@ export default function MasterDashboard() {
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     {renderStateBadge(ticket.state)}
-                                                    <Link href={`/admin/${ticket.slug}`} className="text-zinc-600 hover:text-cyan-400 transition-colors group-hover:translate-x-1 duration-300">
+                                                    <Link href={`/admin/${ticket.slug}`} className="text-zinc-600 hover:text-[#2563EB] transition-colors group-hover:translate-x-1 duration-300">
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                                                     </Link>
                                                 </div>

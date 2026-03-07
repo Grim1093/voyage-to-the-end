@@ -29,6 +29,11 @@ export default function NewEventDeployment() {
     const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
 
     useEffect(() => {
+        // Step log tracking initialization and theme confirmation
+        console.log(`${context} Component mounted - Royal Blue / Electric Violet theme active`);
+    }, []);
+
+    useEffect(() => {
         const validateGatekeeper = () => {
             const sessionString = sessionStorage.getItem('adminSession');
             if (!sessionString) {
@@ -148,11 +153,11 @@ export default function NewEventDeployment() {
                     animate={{ scale: 1, opacity: 1 }}
                     className="bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[40px] p-12 max-w-lg text-center shadow-2xl z-10 relative overflow-hidden group"
                 >
-                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-emerald-400/10 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#7C3AED]/15 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
                     
                     <div className="relative z-10">
-                        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/20">
-                            <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        <div className="w-20 h-20 bg-[#7C3AED]/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-[#7C3AED]/20">
+                            <svg className="w-10 h-10 text-[#7C3AED]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         </div>
                         <h1 className="text-3xl font-medium text-white mb-4 tracking-tight">Deployment Complete</h1>
                         <p className="text-zinc-500 mb-10 leading-relaxed text-sm tracking-wide">
@@ -173,7 +178,7 @@ export default function NewEventDeployment() {
     }
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
+        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden">
             
             <AmbientAurora />
             <InteractiveAura />
@@ -185,7 +190,7 @@ export default function NewEventDeployment() {
                     </Link>
                     <div>
                         <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Node Deployment</h1>
-                        <p className="text-[9px] text-cyan-400 font-mono tracking-wide uppercase tracking-widest">Master Tenant Provisioning</p>
+                        <p className="text-[9px] text-[#7C3AED] font-mono tracking-wide uppercase tracking-widest">Master Tenant Provisioning</p>
                     </div>
                 </div>
             </header>
@@ -196,9 +201,9 @@ export default function NewEventDeployment() {
                 animate="show"
                 className="max-w-2xl w-full z-10 relative px-6 pb-16 pt-8"
             >
-                <motion.div variants={itemVariant} className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl relative group transition-all duration-500 hover:shadow-[0_0_30px_rgba(34,211,238,0.05)]">
+                <motion.div variants={itemVariant} className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl relative group transition-all duration-500 hover:shadow-[0_0_30px_rgba(37,99,235,0.05)]">
                     
-                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-[#2563EB]/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
                     <form onSubmit={handleSubmit} className="p-10 space-y-10 relative z-10">
                         {status === 'error' && (
@@ -217,13 +222,13 @@ export default function NewEventDeployment() {
                                     onChange={handleNameChange}
                                     placeholder="e.g., Global Tech Summit 2026"
                                     required
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                 />
                             </div>
 
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">URL Slug</label>
-                                <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/30 transition-all shadow-inner">
+                                <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-[#2563EB]/50 focus-within:border-[#2563EB]/30 transition-all shadow-inner">
                                     <span className="flex items-center pl-6 pr-2 text-zinc-600 text-[10px] font-mono uppercase tracking-tight">
                                         node/
                                     </span>
@@ -248,7 +253,7 @@ export default function NewEventDeployment() {
                                         name="startDate"
                                         value={formData.startDate}
                                         onChange={handleChange}
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner [color-scheme:dark]"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 transition-all text-sm shadow-inner [color-scheme:dark]"
                                     />
                                 </div>
                                 <div className="space-y-2">
@@ -258,7 +263,7 @@ export default function NewEventDeployment() {
                                         name="endDate"
                                         value={formData.endDate}
                                         onChange={handleChange}
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner [color-scheme:dark]"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 transition-all text-sm shadow-inner [color-scheme:dark]"
                                     />
                                 </div>
                             </div>
@@ -271,7 +276,7 @@ export default function NewEventDeployment() {
                                     value={formData.location}
                                     onChange={handleChange}
                                     placeholder="New Delhi, India"
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                 />
                             </div>
 
@@ -283,7 +288,7 @@ export default function NewEventDeployment() {
                                     onChange={handleChange}
                                     placeholder="Describe the node's purpose..."
                                     rows="3"
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm resize-none placeholder-zinc-700 shadow-inner"
+                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/50 focus:border-[#2563EB]/30 transition-all text-sm resize-none placeholder-zinc-700 shadow-inner"
                                 />
                             </div>
 
@@ -313,13 +318,13 @@ export default function NewEventDeployment() {
                                         onChange={(e) => setCurrentImageUrl(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleAddImage(e)}
                                         placeholder="https://hosted-image-url.com/node.jpg"
-                                        className="flex-1 bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                        className="flex-1 bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-[#2563EB]/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                     />
                                     <button 
                                         type="button"
                                         onClick={handleAddImage}
                                         disabled={!currentImageUrl.trim()}
-                                        className="px-6 rounded-full bg-white/[0.05] hover:bg-cyan-500/20 border border-white/[0.05] hover:border-cyan-500/30 text-zinc-300 hover:text-cyan-400 font-bold text-[10px] uppercase tracking-widest transition-all disabled:opacity-30"
+                                        className="px-6 rounded-full bg-white/[0.05] hover:bg-[#2563EB]/20 border border-white/[0.05] hover:border-[#2563EB]/30 text-zinc-300 hover:text-[#2563EB] font-bold text-[10px] uppercase tracking-widest transition-all disabled:opacity-30"
                                     >
                                         Attach
                                     </button>
@@ -365,7 +370,7 @@ export default function NewEventDeployment() {
                                             onChange={handleChange}
                                             className="sr-only" 
                                         />
-                                        <div className={`w-11 h-6 rounded-full transition-all duration-300 ${formData.isPublic ? 'bg-cyan-500/40' : 'bg-white/[0.05]'}`}></div>
+                                        <div className={`w-11 h-6 rounded-full transition-all duration-300 ${formData.isPublic ? 'bg-[#2563EB]/40' : 'bg-white/[0.05]'}`}></div>
                                         <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${formData.isPublic ? 'translate-x-5' : ''}`}></div>
                                     </div>
                                     <div className="ml-4">
