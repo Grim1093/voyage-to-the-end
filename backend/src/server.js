@@ -25,15 +25,23 @@ const PORT = process.env.PORT || 3000;
 console.log('[Security] Step 2: Configuring Dynamic CORS Origin Gateway...');
 
 const staticAllowedOrigins = [
+    'http://localhost:3000',
     'http://localhost:3001',
     process.env.FRONTEND_URL 
 ].filter(Boolean);
 
 const corsDelegate = (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+    
+    // Check strict whitelist
     if (staticAllowedOrigins.includes(origin)) return callback(null, true);
     
-    const isVercelPreview = /^https:\/\/voyage-to-the-end.*\.vercel\.app$/.test(origin);
+    // ARCHITECT NOTE: Upgraded Vercel Preview Regex.
+    // This now successfully catches both branch previews (voyage-to-the-end-git...) 
+    // and hash previews (voyage-to-the-ihv381qi2...) by validating the HTTPS protocol and the vercel.app root.
+    const isVercelPreview = /^https:\/\/.*\.vercel\.app$/.test(origin);
+    
     if (isVercelPreview) {
         console.log(`[Security] Step 2.1: Authorized dynamic Vercel preview branch: ${origin}`);
         return callback(null, true);
