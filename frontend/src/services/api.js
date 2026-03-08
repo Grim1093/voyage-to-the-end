@@ -296,6 +296,37 @@ export const loginGuest = async (eventSlug, email, accessCode) => {
     }
 };
 
+export const logoutAdmin = async () => {
+    const context = `[Frontend API Service - logoutAdmin]`;
+    console.log(`${context} Step 1: Requesting session lock dissolution.`);
+
+    try {
+        const token = getValidToken(context);
+
+        const response = await fetch(`${API_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point: Server rejected explicit logout.`, data.message);
+        } else {
+            console.log(`${context} Step 2: Session lock successfully dissolved on backend.`);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error during logout.`, error.message);
+        // We still throw, but the UI should clear the local token anyway just in case.
+        throw error;
+    }
+};
+
 export const resendAccessCode = async (eventSlug, email) => {
     const context = `[Frontend API Service - resendAccessCode - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating code recovery for ${email}`);
@@ -431,6 +462,121 @@ export const fetchEventDetails = async (eventSlug) => {
 
     } catch (error) {
         console.error(`${context} CRITICAL FAILURE: Network error fetching event ${eventSlug}.`, error.message);
+        throw error;
+    }
+};
+
+// --- ITINERARY ENGINE PIPELINES ---
+export const fetchEventSchedule = async (eventSlug) => {
+    const context = `[Frontend API Service - fetchEventSchedule - ${eventSlug}]`;
+    console.log(`${context} Step 1: Fetching raw itinerary payload.`);
+
+    try {
+        const response = await fetch(`${API_URL}/events/${eventSlug}/schedule`, {
+            method: 'GET',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point EV-SCH-F1: Failed to fetch schedule.`, data.message);
+            throw new Error(data.message || 'Failed to fetch the itinerary.');
+        }
+
+        return data.data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error fetching schedule for ${eventSlug}.`, error.message);
+        throw error;
+    }
+};
+
+export const updateEventSchedule = async (eventSlug, scheduleData) => {
+    const context = `[Frontend API Service - updateEventSchedule - ${eventSlug}]`;
+    console.log(`${context} Step 1: Initiating Master Itinerary Override payload...`, scheduleData);
+
+    try {
+        const token = getValidToken(context);
+
+        // ARCHITECT NOTE: This is a PUT request to trigger an atomic wipe-and-replace on the backend
+        const response = await fetch(`${API_URL}/events/${eventSlug}/schedule`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ schedule: scheduleData }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point EV-SCH-F2: Server rejected schedule synchronization.`, data.message);
+            throw new Error(data.message || 'Failed to synchronize schedule.');
+        }
+
+        console.log(`${context} Step 2: Itinerary successfully synchronized!`);
+        return data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error synchronizing schedule.`, error.message);
+        throw error;
+    }
+};
+
+// --- VECTOR 2: TELEMETRY & KILL SWITCH PIPELINES ---
+export const fetchEventTelemetry = async (eventSlug) => {
+    const context = `[Frontend API Service - fetchEventTelemetry - ${eventSlug}]`;
+    console.log(`${context} Step 1: Fetching live telemetry data.`);
+
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/events/${eventSlug}/telemetry`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point TEL-F1: Failed to fetch telemetry.`, data.message);
+            throw new Error(data.message || 'Failed to fetch telemetry data.');
+        }
+
+        return data.data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error fetching telemetry.`, error.message);
+        throw error;
+    }
+};
+
+export const triggerMeshDissolve = async (eventSlug) => {
+    const context = `[Frontend API Service - triggerMeshDissolve - ${eventSlug}]`;
+    console.log(`${context} !!! Step 1: Initiating KILL SWITCH for event ${eventSlug}. !!!`);
+
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/events/${eventSlug}/dissolve`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point DISSOLVE-F1: Server rejected dissolve command.`, data.message);
+            throw new Error(data.message || 'Failed to execute Kill Switch.');
+        }
+
+        console.log(`${context} Step 2: Mesh successfully dissolved.`);
+        return data;
+
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error during dissolve protocol.`, error.message);
         throw error;
     }
 };

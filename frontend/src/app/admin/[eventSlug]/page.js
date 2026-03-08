@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link'; 
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAllGuests, updateGuestState, fetchGuestDetails } from '../../../services/api';
+// [Architecture] Added fetchEventDetails to check the Archive Lock
+import { getAllGuests, updateGuestState, fetchGuestDetails, fetchEventDetails } from '../../../services/api';
 import { LumaDropdown } from '@/components/ui/luma-dropdown';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
@@ -28,9 +29,16 @@ export default function GuestLedgerDashboard() {
     const [totalGuests, setTotalGuests] = useState(0);
     const [limit, setLimit] = useState(10);
 
+    // [Architecture] State to track if the node is in the Immutable Archive
+    const [isArchived, setIsArchived] = useState(false);
+
     const fetchLedger = useCallback(async (pageToFetch = currentPage, limitToFetch = limit) => {
         setStatus('loading');
         try {
+            // First, fetch event details to check the Archive Lock
+            const eventData = await fetchEventDetails(eventSlug);
+            setIsArchived(eventData.is_expired);
+
             const result = await getAllGuests(eventSlug, pageToFetch, limitToFetch); 
             setGuests(result.data);
             setCurrentPage(result.pagination.currentPage);
@@ -42,8 +50,9 @@ export default function GuestLedgerDashboard() {
             setStatus('error');
             setMessage(error.message);
 
-            if (error.message.includes('Forbidden') || error.message.includes('Unauthorized')) {
-                // [Architecture] Purge the JWT on unauthorized access
+            const msg = error.message.toLowerCase();
+            if (msg.includes('forbidden') || msg.includes('unauthorized') || msg.includes('session') || msg.includes('401') || msg.includes('403')) {
+                // [Architecture] Purge the JWT on unauthorized access or session bounce
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             }
@@ -68,6 +77,12 @@ export default function GuestLedgerDashboard() {
     }, [fetchLedger, router, context]);
 
     const handleStateChange = async (guestId, newState) => {
+        // Double check against tampering
+        if (isArchived) {
+            alert("This node is permanently archived. State mutations are locked.");
+            return;
+        }
+
         try {
             await updateGuestState(eventSlug, guestId, newState);
             fetchLedger(currentPage, limit); 
@@ -145,7 +160,12 @@ export default function GuestLedgerDashboard() {
                     </Link>
                     <div>
                         <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Ledger Explorer</h1>
-                        <p className="text-[9px] text-cyan-400 font-mono tracking-widest uppercase">Target: /{eventSlug}</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-[9px] text-cyan-400 font-mono tracking-widest uppercase">Target: /{eventSlug}</p>
+                            {isArchived && (
+                                <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase bg-rose-500/10 text-rose-500 border border-rose-500/20">ARCHIVED</span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -187,7 +207,7 @@ export default function GuestLedgerDashboard() {
                             initial="hidden" 
                             animate="show"
                         >
-                            <motion.div variants={itemVariant} className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] shadow-2xl relative">
+                            <motion.div variants={itemVariant} className={`bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] shadow-2xl relative ${isArchived ? 'opacity-90' : ''}`}>
                                 <div className="overflow-x-auto rounded-t-[32px]">
                                     <table className="w-full text-left border-collapse">
                                         <thead>
@@ -215,7 +235,7 @@ export default function GuestLedgerDashboard() {
                                                             {new Date(guest.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                                                         </td>
                                                         <td className="px-8 py-5">
-                                                            <div className="flex justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                            <div className={`flex justify-end gap-2 transition-opacity ${isArchived ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`}>
                                                                 <button 
                                                                     onClick={() => handleInspectGuest(guest.id)}
                                                                     disabled={inspectLoading === guest.id}
@@ -223,10 +243,16 @@ export default function GuestLedgerDashboard() {
                                                                 >
                                                                     {inspectLoading === guest.id ? '...' : 'Inspect'}
                                                                 </button>
-                                                                <button onClick={() => handleStateChange(guest.id, 2)} className="px-3 py-1.5 rounded-full bg-emerald-500/5 border border-emerald-500/20 text-emerald-500/80 hover:text-emerald-400 hover:bg-emerald-500/10 text-[10px] font-bold uppercase transition-all">Verify</button>
-                                                                <button onClick={() => handleStateChange(guest.id, -1)} className="px-3 py-1.5 rounded-full bg-rose-500/5 border border-rose-500/20 text-rose-500/80 hover:text-rose-400 hover:bg-rose-500/10 text-[10px] font-bold uppercase transition-all">Reject</button>
-                                                                {guest.current_state !== 1 && (
-                                                                    <button onClick={() => handleStateChange(guest.id, 1)} className="px-3 py-1.5 rounded-full bg-amber-500/5 border border-amber-500/20 text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/10 text-[10px] font-bold uppercase transition-all">Reset</button>
+                                                                
+                                                                {/* ARCHITECTURE: Immutable Archive Lock - Hide state mutations if expired */}
+                                                                {!isArchived && (
+                                                                    <>
+                                                                        <button onClick={() => handleStateChange(guest.id, 2)} className="px-3 py-1.5 rounded-full bg-emerald-500/5 border border-emerald-500/20 text-emerald-500/80 hover:text-emerald-400 hover:bg-emerald-500/10 text-[10px] font-bold uppercase transition-all">Verify</button>
+                                                                        <button onClick={() => handleStateChange(guest.id, -1)} className="px-3 py-1.5 rounded-full bg-rose-500/5 border border-rose-500/20 text-rose-500/80 hover:text-rose-400 hover:bg-rose-500/10 text-[10px] font-bold uppercase transition-all">Reject</button>
+                                                                        {guest.current_state !== 1 && (
+                                                                            <button onClick={() => handleStateChange(guest.id, 1)} className="px-3 py-1.5 rounded-full bg-amber-500/5 border border-amber-500/20 text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/10 text-[10px] font-bold uppercase transition-all">Reset</button>
+                                                                        )}
+                                                                    </>
                                                                 )}
                                                             </div>
                                                         </td>

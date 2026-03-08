@@ -43,6 +43,49 @@ router.get('/domain/:hostname', (req, res) => {
     eventController.getEventByDomain(req, res);
 });
 
+// --- ITINERARY ENGINE ROUTES ---
+
+/**
+ * Route: GET /api/events/:eventSlug/schedule
+ * Purpose: Fetch the raw temporal itinerary for a specific tenant.
+ */
+router.get('/:eventSlug/schedule', (req, res) => {
+    logger.info('EventRoutes', `Incoming GET request for schedule of event: ${req.params.eventSlug}`);
+    eventController.getEventSchedule(req, res);
+});
+
+/**
+ * Route: PUT /api/events/:eventSlug/schedule
+ * Purpose: Admin syncs a new Master Schedule array. Protected by middleware.
+ * ARCHITECT NOTE: Using PUT because the controller performs an atomic wipe-and-replace of the schedule.
+ */
+router.put('/:eventSlug/schedule', requireAdminKey, (req, res) => {
+    logger.info('EventRoutes', `Incoming PUT request to synchronize schedule for event: ${req.params.eventSlug}`);
+    eventController.updateEventSchedule(req, res);
+});
+
+// --- VECTOR 2: TELEMETRY & KILL SWITCH ---
+
+/**
+ * Route: GET /api/events/:eventSlug/telemetry
+ * Purpose: Admin fetches live WebSocket connection counts. Protected by middleware.
+ */
+router.get('/:eventSlug/telemetry', requireAdminKey, (req, res) => {
+    logger.info('EventRoutes', `Incoming GET request for telemetry of event: ${req.params.eventSlug}`);
+    eventController.getEventTelemetry(req, res);
+});
+
+/**
+ * Route: POST /api/events/:eventSlug/dissolve
+ * Purpose: Admin executes the Kill Switch to manually archive the event and fire emails. Strictly protected.
+ */
+router.post('/:eventSlug/dissolve', requireAdminKey, (req, res) => {
+    logger.info('EventRoutes', `Incoming POST request to DISSOLVE mesh for event: ${req.params.eventSlug}`);
+    eventController.dissolveEventMesh(req, res);
+});
+
+// --- END VECTOR 2 ROUTES ---
+
 /**
  * Route: GET /api/events/:eventSlug
  * Purpose: Fetch metadata for a specific event to populate the Event Hub.
@@ -65,7 +108,6 @@ router.patch('/:eventSlug', requireAdminKey, (req, res) => {
  * Route: DELETE /api/events/:eventSlug
  * Purpose: Admin executes the destructive purge protocol. Strictly protected.
  */
-// ARCHITECT NOTE: Injected requireAdminKey to secure the endpoint!
 router.delete('/:eventSlug', requireAdminKey, (req, res) => {
     logger.info('EventRoutes', `Incoming DELETE request to purge tenant: ${req.params.eventSlug}`);
     eventController.deleteEvent(req, res);

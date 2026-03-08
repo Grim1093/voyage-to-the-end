@@ -4,7 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchEventDetails, updateEventDetails, deleteEvent } from '../../../../../services/api';
+import { 
+    fetchEventDetails, 
+    updateEventDetails, 
+    deleteEvent, 
+    updateEventSchedule,
+    fetchEventTelemetry,      // NEW: Vector 2
+    triggerMeshDissolve       // NEW: Vector 2
+} from '../../../../../services/api';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
 
@@ -33,12 +40,34 @@ export default function EditEventDeployment() {
         }
     });
 
+    // --- ITINERARY ENGINE STATE ---
+    const [scheduleItems, setScheduleItems] = useState([]);
+    const [newScheduleNode, setNewScheduleNode] = useState({
+        title: '',
+        description: '',
+        speaker_name: '',
+        location: '',
+        start_time: '',
+        end_time: ''
+    });
+
+    // --- VECTOR 2: TELEMETRY & KILL SWITCH STATE ---
+    const [telemetry, setTelemetry] = useState({ activeConnections: 0, totalRegisteredVerified: 0 });
+    const [isConfirmingDissolve, setIsConfirmingDissolve] = useState(false);
+
     const [currentImageUrl, setCurrentImageUrl] = useState('');
     const [status, setStatus] = useState('loading'); 
     const [message, setMessage] = useState('');
     const [newSlug, setNewSlug] = useState('');
     
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+    const formatForInput = (isoString) => {
+        if (!isoString) return '';
+        const date = new Date(isoString);
+        const tzOffset = date.getTimezoneOffset() * 60000;
+        return (new Date(date - tzOffset)).toISOString().slice(0, 16);
+    };
 
     useEffect(() => {
         // [Architecture] Upgraded to Cryptographic JWT Validation
@@ -54,14 +83,14 @@ export default function EditEventDeployment() {
         const loadEventData = async () => {
             try {
                 const data = await fetchEventDetails(currentEventSlug);
-                
-                const formatForInput = (isoString) => {
-                    if (!isoString) return '';
-                    const date = new Date(isoString);
-                    const tzOffset = date.getTimezoneOffset() * 60000;
-                    return (new Date(date - tzOffset)).toISOString().slice(0, 16);
-                };
 
+                // ARCHITECTURE: Immutable Archive Lock - Bounce direct URL access
+                if (data.is_expired) {
+                    console.warn(`${context} Node is archived. Modifications strictly prohibited.`);
+                    router.push(`/admin/${currentEventSlug}`); // Redirect to the read-only ledger
+                    return;
+                }
+                
                 setFormData({
                     name: data.title || '',
                     slug: data.slug || '',
@@ -79,9 +108,29 @@ export default function EditEventDeployment() {
                         accent: data.theme_config?.accent || '#3b82f6'
                     }
                 });
+
+                // [Architecture] Hydrate the Itinerary Engine with existing temporal nodes
+                if (data.schedule && Array.isArray(data.schedule)) {
+                    const formattedSchedule = data.schedule.map(item => ({
+                        ...item,
+                        start_time: formatForInput(item.start_time),
+                        end_time: formatForInput(item.end_time)
+                    }));
+                    setScheduleItems(formattedSchedule);
+                }
+
                 setStatus('idle');
             } catch (error) {
                 console.error(`${context} Failed to fetch event details.`, error);
+
+                // ARCHITECT NOTE: Security Bounce Check
+                const msg = error.message.toLowerCase();
+                if (msg.includes('session') || msg.includes('unauthorized')) {
+                    localStorage.removeItem('adminToken');
+                    router.push('/admin/login');
+                    return;
+                }
+
                 setStatus('error');
                 setMessage('Could not load event data. It may have been deleted.');
             }
@@ -92,6 +141,35 @@ export default function EditEventDeployment() {
         }
     }, [currentEventSlug, router, context]);
 
+    // --- VECTOR 2: TELEMETRY POLLER ---
+    useEffect(() => {
+        if (status !== 'idle') return;
+
+        const pollTelemetry = async () => {
+            try {
+                const data = await fetchEventTelemetry(currentEventSlug);
+                setTelemetry(data);
+            } catch (error) {
+                console.warn(`${context} Telemetry poll failed.`, error.message);
+                
+                // ARCHITECT NOTE: If telemetry fails because the token was revoked, bounce them out instantly!
+                const msg = error.message.toLowerCase();
+                if (msg.includes('session') || msg.includes('unauthorized')) {
+                    localStorage.removeItem('adminToken');
+                    router.push('/admin/login');
+                }
+            }
+        };
+
+        // Initial poll
+        pollTelemetry();
+        // Setup interval for live updates every 10 seconds
+        const intervalId = setInterval(pollTelemetry, 10000);
+
+        return () => clearInterval(intervalId);
+    }, [currentEventSlug, status, context, router]); 
+
+    
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData({
@@ -139,6 +217,69 @@ export default function EditEventDeployment() {
         }));
     };
 
+    // --- ITINERARY ENGINE HANDLERS ---
+    const handleNewScheduleChange = (e) => {
+        const { name, value } = e.target;
+        setNewScheduleNode(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleAddScheduleNode = () => {
+        if (!newScheduleNode.title || !newScheduleNode.start_time || !newScheduleNode.end_time) {
+            alert("Title, Start Time, and End Time are strictly required for temporal nodes.");
+            return;
+        }
+
+        const nodeStart = new Date(newScheduleNode.start_time);
+        const nodeEnd = new Date(newScheduleNode.end_time);
+
+        if (nodeStart >= nodeEnd) {
+            alert("Temporal paradox detected: Start Time must precede End Time.");
+            return;
+        }
+
+        if (formData.startDate) {
+            const eventStart = new Date(formData.startDate);
+            if (nodeStart < eventStart) {
+                alert("Anomaly: Schedule node cannot begin before the Master Event start time.");
+                return;
+            }
+        }
+
+        if (formData.endDate) {
+            const eventEnd = new Date(formData.endDate);
+            if (nodeEnd > eventEnd) {
+                alert("Anomaly: Schedule node cannot end after the Master Event end time.");
+                return;
+            }
+        }
+
+        setScheduleItems([...scheduleItems, { ...newScheduleNode }]);
+        setNewScheduleNode({ title: '', description: '', speaker_name: '', location: '', start_time: '', end_time: '' });
+    };
+
+    const handleRemoveScheduleNode = (indexToRemove) => {
+        setScheduleItems(prev => prev.filter((_, index) => index !== indexToRemove));
+    };
+
+    // --- VECTOR 2: KILL SWITCH HANDLER ---
+    const handleDissolveMesh = async () => {
+        if (!isConfirmingDissolve) {
+            setIsConfirmingDissolve(true);
+            return;
+        }
+
+        setStatus('submitting');
+        try {
+            await triggerMeshDissolve(currentEventSlug);
+            setStatus('success');
+            setMessage(`The Ephemeral Mesh has been successfully dissolved. All connections severed and emails dispatched.`);
+        } catch (error) {
+            setStatus('error');
+            setMessage(error.message || 'Failed to dissolve the mesh.');
+            setIsConfirmingDissolve(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         
@@ -164,13 +305,24 @@ export default function EditEventDeployment() {
                 endDate: formData.endDate ? new Date(formData.endDate).toISOString() : null
             };
 
+            // 1. Update Core Tenant Metadata
             const result = await updateEventDetails(currentEventSlug, payload);
+            
+            // 2. Synchronize Master Itinerary
+            const syncSchedule = scheduleItems.map(item => ({
+                ...item,
+                start_time: new Date(item.start_time).toISOString(),
+                end_time: new Date(item.end_time).toISOString()
+            }));
+            
+            await updateEventSchedule(currentEventSlug, syncSchedule);
+
             setNewSlug(result.data.slug);
             setStatus('success');
-            setMessage(`Tenant "${formData.name}" has been successfully updated.`);
+            setMessage(`Tenant "${formData.name}" and Itinerary have been successfully synchronized.`);
         } catch (error) {
             setStatus('error');
-            setMessage(error.message || 'Failed to update the event.');
+            setMessage(error.message || 'Failed to update the event network.');
         }
     };
 
@@ -227,16 +379,16 @@ export default function EditEventDeployment() {
                         <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 border border-emerald-500/20">
                             <svg className="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                         </div>
-                        <h1 className="text-3xl font-medium text-white mb-4">Node Updated</h1>
+                        <h1 className="text-3xl font-medium text-white mb-4">Command Executed</h1>
                         <p className="text-zinc-500 mb-10 leading-relaxed text-sm tracking-wide">
-                            {message} The environment changes have been committed to the global network.
+                            {message}
                         </p>
                         <div className="flex flex-col gap-4">
-                            <Link href={`/${newSlug}`} target="_blank" className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
+                            <Link href={`/${newSlug || currentEventSlug}`} target="_blank" className="w-full py-4 px-6 bg-white text-black rounded-full font-bold text-xs uppercase tracking-widest transition-all hover:bg-zinc-200">
                                 View Live Hub
                             </Link>
                             <Link href="/admin" className="w-full py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-zinc-300 rounded-full font-bold text-xs uppercase tracking-widest transition-all">
-                                Control Plane
+                                Return to Control Plane
                             </Link>
                         </div>
                     </div>
@@ -274,6 +426,37 @@ export default function EditEventDeployment() {
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
                     <form onSubmit={handleSubmit} className="p-10 space-y-10 relative z-10">
+                        
+                        {/* ARCHITECTURE: Active Node Control (Telemetry & Kill Switch) */}
+                        <div className="p-6 rounded-[24px] border border-amber-500/20 bg-amber-500/5 shadow-inner flex flex-col sm:flex-row justify-between items-center gap-6">
+                            <div className="flex items-center gap-6">
+                                <div className="flex flex-col items-center">
+                                    <div className="relative">
+                                        <div className="absolute inset-0 bg-emerald-500 rounded-full blur-md opacity-30 animate-pulse"></div>
+                                        <span className="relative text-3xl font-mono text-white tracking-tighter">{telemetry.activeConnections}</span>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Live Sockets</span>
+                                </div>
+                                <div className="h-8 w-[1px] bg-white/[0.1]"></div>
+                                <div className="flex flex-col items-center">
+                                    <span className="text-xl font-mono text-zinc-300 tracking-tighter">{telemetry.totalRegisteredVerified}</span>
+                                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Verified Guests</span>
+                                </div>
+                            </div>
+                            
+                            <button 
+                                type="button" 
+                                onClick={handleDissolveMesh}
+                                className={`px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all ${
+                                    isConfirmingDissolve 
+                                    ? 'bg-amber-500 text-black shadow-[0_0_20px_rgba(245,158,11,0.4)] animate-pulse' 
+                                    : 'bg-transparent border border-amber-500/30 text-amber-500 hover:bg-amber-500/10'
+                                }`}
+                            >
+                                {isConfirmingDissolve ? 'Confirm Dissolve' : 'Dissolve Mesh'}
+                            </button>
+                        </div>
+
                         {status === 'error' && (
                             <div className="p-4 bg-rose-500/5 border border-rose-500/10 text-rose-400/80 text-xs font-medium rounded-2xl tracking-wide">
                                 {message}
@@ -354,6 +537,86 @@ export default function EditEventDeployment() {
                                     rows="3"
                                     className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm resize-none shadow-inner"
                                 />
+                            </div>
+
+                            {/* ARCHITECTURE: Itinerary Engine UI */}
+                            <div className="space-y-6 pt-8 border-t border-white/[0.03]">
+                                <div className="flex justify-between items-end ml-2 mb-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Temporal Itinerary</label>
+                                </div>
+
+                                {/* Active Schedule Nodes */}
+                                {scheduleItems.length > 0 && (
+                                    <div className="space-y-3">
+                                        <AnimatePresence>
+                                            {scheduleItems.map((item, idx) => (
+                                                <motion.div 
+                                                    key={idx}
+                                                    initial={{ opacity: 0, height: 0 }}
+                                                    animate={{ opacity: 1, height: 'auto' }}
+                                                    exit={{ opacity: 0, height: 0 }}
+                                                    className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex justify-between items-center shadow-inner group"
+                                                >
+                                                    <div>
+                                                        <h4 className="text-white text-sm font-bold truncate">{item.title}</h4>
+                                                        <p className="text-[10px] text-cyan-400 font-mono mt-1">
+                                                            {new Date(item.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(item.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                        {(item.speaker_name || item.location) && (
+                                                            <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-wider">
+                                                                {item.speaker_name} {item.speaker_name && item.location && ' | '} {item.location}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => handleRemoveScheduleNode(idx)}
+                                                        className="w-8 h-8 rounded-full bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors flex-shrink-0"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+
+                                {/* Add New Node Form */}
+                                <div className="p-5 rounded-[24px] border border-cyan-500/20 bg-cyan-500/5 space-y-4">
+                                    <h4 className="text-[10px] text-cyan-500 font-bold uppercase tracking-widest mb-3">Deploy Schedule Node</h4>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <input type="text" name="title" value={newScheduleNode.title} onChange={handleNewScheduleChange} placeholder="Panel Title (Required)" className="w-full bg-black/40 border border-white/[0.05] text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-500/50" />
+                                        <input type="text" name="speaker_name" value={newScheduleNode.speaker_name} onChange={handleNewScheduleChange} placeholder="Speaker Name (Optional)" className="w-full bg-black/40 border border-white/[0.05] text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-500/50" />
+                                        <input 
+                                            type="datetime-local" 
+                                            name="start_time" 
+                                            value={newScheduleNode.start_time} 
+                                            onChange={handleNewScheduleChange} 
+                                            min={formData.startDate}
+                                            max={formData.endDate}
+                                            className="w-full bg-black/40 border border-white/[0.05] text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-500/50 [color-scheme:dark]" 
+                                        />
+                                        <input 
+                                            type="datetime-local" 
+                                            name="end_time" 
+                                            value={newScheduleNode.end_time} 
+                                            onChange={handleNewScheduleChange} 
+                                            min={formData.startDate}
+                                            max={formData.endDate}
+                                            className="w-full bg-black/40 border border-white/[0.05] text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-500/50 [color-scheme:dark]" 
+                                        />
+                                    </div>
+                                    <input type="text" name="location" value={newScheduleNode.location} onChange={handleNewScheduleChange} placeholder="Location / Room (Optional)" className="w-full bg-black/40 border border-white/[0.05] text-white rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-500/50" />
+                                    
+                                    <button 
+                                        type="button" 
+                                        onClick={handleAddScheduleNode}
+                                        className="w-full py-3 bg-cyan-500/20 hover:bg-cyan-500 text-cyan-300 hover:text-white border border-cyan-500/30 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
+                                    >
+                                        + Append to Timeline
+                                    </button>
+                                </div>
                             </div>
 
                             {/* ARCHITECTURE: MSaaS Edge Configuration */}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchGuestStatus } from '../../../../services/api'; 
+import { fetchGuestStatus, fetchEventSchedule } from '../../../../services/api'; 
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
 import { AbyssProvider, useAbyss } from '@/components/AbyssProvider';
@@ -18,6 +18,8 @@ function GuestDashboardInner() {
     
     const router = useRouter();
     const [guest, setGuest] = useState(null);
+    const [scheduleNodes, setScheduleNodes] = useState([]); // ARCHITECT NOTE: Holds the temporal itinerary
+    const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
     
     // [Architecture] State-based routing extended to 3 tabs
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'feed' | 'directory'
@@ -39,6 +41,7 @@ function GuestDashboardInner() {
             const parsedData = JSON.parse(sessionData);
             setGuest(parsedData); 
 
+            // 1. Sync Live Status
             const syncStatus = async () => {
                 try {
                     const liveState = await fetchGuestStatus(eventSlug, parsedData.id);
@@ -52,6 +55,19 @@ function GuestDashboardInner() {
                 }
             };
             syncStatus();
+
+            // 2. Fetch the Temporal Itinerary
+            const loadSchedule = async () => {
+                try {
+                    const data = await fetchEventSchedule(eventSlug);
+                    setScheduleNodes(data || []);
+                } catch (error) {
+                    console.error(`${context} Failed to fetch itinerary.`, error);
+                } finally {
+                    setIsLoadingSchedule(false);
+                }
+            };
+            loadSchedule();
 
         } catch (error) {
             console.error(`${context} Failure Point FF: Corrupted session data.`, error);
@@ -256,24 +272,58 @@ function GuestDashboardInner() {
                                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-fuchsia-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
                                     
                                     <div className="relative z-10">
-                                        <div className="px-8 py-5 border-b border-white/[0.03]">
+                                        <div className="px-8 py-5 border-b border-white/[0.03] flex justify-between items-center">
                                             <h2 className="text-xs font-bold text-zinc-400 tracking-[0.2em] uppercase">Event Itinerary</h2>
+                                            <span className="text-[10px] font-mono text-zinc-600 uppercase">Hub: {eventSlug.replace(/-/g, ' ')}</span>
                                         </div>
                                         <div className="p-8">
-                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-                                                <div className="space-y-1">
-                                                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Selected Hub</span>
-                                                    <p className="text-sm text-zinc-100 font-medium capitalize">{eventSlug.replace(/-/g, ' ')}</p>
+                                            {isLoadingSchedule ? (
+                                                <div className="flex justify-center items-center py-8">
+                                                    <svg className="animate-spin h-5 w-5 text-fuchsia-500/50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Schedule</span>
-                                                    <p className="text-sm text-zinc-400 font-normal italic">TBD by Node Admin</p>
+                                            ) : scheduleNodes.length === 0 ? (
+                                                <div className="text-center py-8">
+                                                    <p className="text-sm text-zinc-500 font-normal italic">The node administrator has not injected a timeline yet.</p>
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Venue Protocol</span>
-                                                    <p className="text-sm text-zinc-400 font-normal italic">Pending Live Update</p>
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {scheduleNodes.map((node, idx) => (
+                                                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.03] transition-colors group/node">
+                                                            <div className="w-full sm:w-32 flex-shrink-0">
+                                                                <p className="text-xs font-mono text-fuchsia-400/80 group-hover/node:text-fuchsia-400 transition-colors">
+                                                                    {new Date(node.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </p>
+                                                                <p className="text-[10px] font-mono text-zinc-600 mt-1">
+                                                                    {new Date(node.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                </p>
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <h3 className="text-sm font-bold text-zinc-200">{node.title}</h3>
+                                                                {(node.speaker_name || node.location) && (
+                                                                    <div className="flex items-center gap-3 mt-2">
+                                                                        {node.speaker_name && (
+                                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                                                                {node.speaker_name}
+                                                                            </span>
+                                                                        )}
+                                                                        {node.speaker_name && node.location && <span className="w-1 h-1 rounded-full bg-zinc-700" />}
+                                                                        {node.location && (
+                                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                                                {node.location}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {node.description && (
+                                                                    <p className="text-xs text-zinc-400 mt-2 leading-relaxed">{node.description}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

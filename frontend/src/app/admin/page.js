@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchAllAdminEvents, fetchGlobalGuests } from '../../services/api';
+// [Architecture] Import the explicit logout dispatcher
+import { fetchAllAdminEvents, fetchGlobalGuests, logoutAdmin } from '../../services/api';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
 
@@ -34,10 +35,17 @@ export default function MasterDashboard() {
             return true;
         };
 
-        const handleLogout = () => {
+        const handleLogout = async () => {
             console.log(`${context} Action: Session purged due to inactivity.`);
-            localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
-            router.push('/admin/login');
+            try {
+                // Dissolve the Valkey lock first
+                await logoutAdmin();
+            } catch (err) {
+                console.warn(`${context} Network fail during inactivity logout, purging local token regardless.`);
+            } finally {
+                localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
+                router.push('/admin/login');
+            }
         };
 
         const resetInactivityTimer = () => {
@@ -73,8 +81,9 @@ export default function MasterDashboard() {
             setStatus('success');
         } catch (error) {
             console.error(`${context} Failure fetching tenants:`, error);
-            // If the fetch fails because the token expired, bounce them out
-            if (error.message.includes('401') || error.message.includes('403')) {
+            // ARCHITECT NOTE: Check for explicit security messages instead of just status codes
+            const msg = error.message.toLowerCase();
+            if (msg.includes('401') || msg.includes('403') || msg.includes('session') || msg.includes('unauthorized')) {
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             } else {
@@ -91,7 +100,8 @@ export default function MasterDashboard() {
             setStatus('success');
         } catch (error) {
             console.error(`${context} Failure fetching global guests:`, error);
-            if (error.message.includes('401') || error.message.includes('403')) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes('401') || msg.includes('403') || msg.includes('session') || msg.includes('unauthorized')) {
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             } else {
@@ -100,9 +110,16 @@ export default function MasterDashboard() {
         }
     };
 
-    const handleLockVault = () => {
-        localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT on manual lock
-        router.push('/admin/login');
+    const handleLockVault = async () => {
+        try {
+            // [Architecture] Dissolve the Valkey lock to free up the concurrent session limit
+            await logoutAdmin();
+        } catch (err) {
+             console.warn(`${context} Network fail during explicit logout, purging local token regardless.`);
+        } finally {
+            localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
+            router.push('/admin/login');
+        }
     };
 
     const renderStateBadge = (state) => {
@@ -169,9 +186,12 @@ export default function MasterDashboard() {
                         <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white text-zinc-300 hover:text-black py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all shadow-inner hover:shadow-none">
                             {event.is_expired ? 'View Ledger' : 'Manage Node'}
                         </Link>
-                        <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        </Link>
+                        {/* ARCHITECTURE: Immutable Archive Lock - Hide Edit button for historical nodes */}
+                        {!event.is_expired && (
+                            <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </Link>
+                        )}
                     </div>
                 </div>
             </motion.div>

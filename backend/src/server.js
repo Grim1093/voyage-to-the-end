@@ -53,7 +53,8 @@ const corsDelegate = (origin, callback) => {
 
 const corsOptions = {
     origin: corsDelegate,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    // ARCHITECT NOTE: Added 'PUT' to authorize the atomic wipe-and-replace Itinerary Engine payloads
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     // [Architecture] Added 'Authorization' to allowed headers for JWT bearer token transmission
     allowedHeaders: ['Content-Type', 'x-admin-key', 'Authorization'], 
     credentials: true 
