@@ -1,5 +1,6 @@
 import { Bebas_Neue, Oswald, Montserrat } from "next/font/google";
 import { CustomCursor } from "@/components/ui/custom-cursor";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 // 1. Headings
@@ -28,11 +29,19 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning is required by next-themes to prevent hydration mismatch errors
+    <html lang="en" suppressHydrationWarning>
       <body className={`${bebasNeue.variable} ${oswald.variable} ${montserrat.variable} antialiased selection:bg-[#2563EB]/30 selection:text-white`}>
-        {/* Global Trailing Cursor injected at the highest DOM level */}
-        <CustomCursor />
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {/* Global Trailing Cursor injected at the highest DOM level */}
+          <CustomCursor />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

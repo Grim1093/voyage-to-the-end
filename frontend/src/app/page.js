@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchPublicEvents } from '../services/api';
 import Image from 'next/image';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const EncryptedText = dynamic(
     () => import('@/components/ui/encrypted-text').then((mod) => mod.EncryptedText),
@@ -109,6 +110,7 @@ export default function GlobalPlatformHub() {
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
+        console.log(`${context} Page successfully mounted. Theme capabilities active.`);
         const loadEvents = async () => {
             console.log(`${context} Step 1: Initializing ledger connection for event resolution... Theme config integrated.`);
             try {
@@ -166,22 +168,22 @@ export default function GlobalPlatformHub() {
     };
 
     return (
-        <main className="min-h-screen flex flex-col items-center text-zinc-200 relative selection:bg-[#2563EB]/30 overflow-hidden bg-[#09090b]">
+        <main className="min-h-screen flex flex-col items-center text-foreground relative selection:bg-[#2563EB]/30 overflow-hidden bg-background">
             
             <AmbientAurora />
             
             <header className="w-full max-w-7xl flex items-center justify-between px-6 py-6 z-20">
                 <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                    <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-[10px] tracking-tighter">
                         NX
                     </div>
-                    <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase hidden sm:block">
+                    <span className="font-semibold text-foreground tracking-[0.2em] text-xs uppercase hidden sm:block">
                         Nexus
                     </span>
                 </div>
 
                 <div className="flex-1 max-w-md mx-6 relative group">
-                    <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-[#2563EB] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-[#2563EB] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <input 
@@ -189,19 +191,23 @@ export default function GlobalPlatformHub() {
                         placeholder="Search active tenants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] focus:border-[#2563EB]/30 focus:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm rounded-full py-3 pl-12 pr-6 outline-none transition-all duration-300 backdrop-blur-md"
+                        className="w-full bg-white/[0.02] dark:bg-white/[0.02] bg-black/[0.02] border border-border focus:border-[#2563EB]/30 text-foreground placeholder-muted-foreground text-sm rounded-full py-3 pl-12 pr-6 outline-none transition-all duration-300 backdrop-blur-md"
                     />
                 </div>
 
-                <Link 
-                    href="/admin/login" 
-                    className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] px-5 py-3 rounded-full backdrop-blur-md"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <span className="hidden sm:block">Vault Access</span>
-                </Link>
+                {/* Theme Toggle and Vault Access Group */}
+                <div className="flex items-center gap-4">
+                    <ThemeToggle />
+                    <Link 
+                        href="/admin/login" 
+                        className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-muted-foreground hover:text-foreground transition-colors bg-white/[0.02] dark:bg-white/[0.02] bg-black/[0.02] hover:bg-black/[0.06] dark:hover:bg-white/[0.06] border border-border px-5 py-3 rounded-full backdrop-blur-md"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        <span className="hidden sm:block">Vault Access</span>
+                    </Link>
+                </div>
             </header>
 
             <div className="max-w-7xl w-full z-10 flex flex-col items-center pb-12 pt-16 sm:pt-24 px-6 flex-grow">
@@ -214,12 +220,12 @@ export default function GlobalPlatformHub() {
                     <h1 className="text-5xl sm:text-6xl md:text-7xl font-light tracking-tight leading-tight min-h-[1.2em]">
                         <EncryptedText
                             text="Global Event Ledger"
-                            encryptedClassName="text-zinc-600 font-mono tracking-normal"
-                            revealedClassName="text-white"
+                            encryptedClassName="text-muted-foreground font-mono tracking-normal"
+                            revealedClassName="text-foreground"
                             revealDelayMs={50} 
                         />
                     </h1>
-                    <p className="text-sm sm:text-base text-zinc-500 max-w-xl mx-auto font-normal leading-relaxed tracking-wide">
+                    <p className="text-sm sm:text-base text-muted-foreground max-w-xl mx-auto font-normal leading-relaxed tracking-wide">
                         Secure, multi-tenant state management for enterprise conferences, global exhibitions, and exclusive summits.
                     </p>
                 </motion.div>
@@ -228,7 +234,7 @@ export default function GlobalPlatformHub() {
                     <div className="w-full flex-grow flex flex-col min-h-[300px]">
                         {loading ? (
                             <div className="flex-grow flex flex-col items-center justify-center py-20">
-                                <svg className="animate-spin h-6 w-6 text-zinc-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <svg className="animate-spin h-6 w-6 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -258,17 +264,17 @@ export default function GlobalPlatformHub() {
 
                                                 const hasImages = event.images && event.images.length > 0;
                                                 
-                                                const cardBgClass = hasImages ? 'bg-[#0a0a0c]' : 'bg-white/[0.02] backdrop-blur-xl';
-                                                const titleClass = hasImages ? 'text-white drop-shadow-md' : 'text-zinc-100 group-hover:text-white transition-colors';
-                                                const descClass = hasImages ? 'text-zinc-400 drop-shadow-md' : 'text-zinc-500';
+                                                const cardBgClass = hasImages ? 'bg-card/90' : 'bg-card/50 backdrop-blur-xl';
+                                                const titleClass = hasImages ? 'text-foreground drop-shadow-md' : 'text-foreground/80 group-hover:text-foreground transition-colors';
+                                                const descClass = hasImages ? 'text-muted-foreground drop-shadow-md' : 'text-muted-foreground';
                                                 
-                                                const pillBgClass = hasImages ? 'bg-white/[0.04] shadow-sm' : 'bg-white/[0.02]';
-                                                const pillTextClass = hasImages ? 'text-zinc-300' : 'text-zinc-400';
-                                                const pillIconClass = hasImages ? 'text-zinc-400' : 'text-zinc-500';
+                                                const pillBgClass = hasImages ? 'bg-white/[0.04] dark:bg-black/[0.2] shadow-sm' : 'bg-transparent';
+                                                const pillTextClass = hasImages ? 'text-foreground/80' : 'text-muted-foreground';
+                                                const pillIconClass = hasImages ? 'text-foreground/80' : 'text-muted-foreground';
                                                 
                                                 const buttonClass = hasImages 
-                                                    ? 'bg-white hover:bg-zinc-200 text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] active:scale-95' 
-                                                    : 'bg-white/[0.03] hover:bg-white/[0.1] text-zinc-300 hover:text-white';
+                                                    ? 'bg-foreground hover:bg-foreground/80 text-background shadow-[0_0_15px_rgba(255,255,255,0.1)] active:scale-95' 
+                                                    : 'bg-black/[0.03] dark:bg-white/[0.03] hover:bg-black/[0.1] dark:hover:bg-white/[0.1] text-foreground/80 hover:text-foreground';
 
                                                 return (
                                                     <motion.div 
@@ -278,7 +284,7 @@ export default function GlobalPlatformHub() {
                                                         animate={{ opacity: 1, scale: 1 }}
                                                         exit={{ opacity: 0, scale: 0.95 }}
                                                         transition={{ duration: 0.3 }}
-                                                        className={`group relative overflow-hidden border border-white/[0.05] rounded-[32px] p-6 sm:p-8 flex flex-col transition-all duration-300 ease-out hover:-translate-y-1 ${cardBgClass} ${config.shadow} ${spanClass}`}
+                                                        className={`group relative overflow-hidden border border-border rounded-[32px] p-6 sm:p-8 flex flex-col transition-all duration-300 ease-out hover:-translate-y-1 ${cardBgClass} ${config.shadow} ${spanClass}`}
                                                     >
                                                         {hasImages && <EventSlideshow images={event.images} />}
 
@@ -293,7 +299,7 @@ export default function GlobalPlatformHub() {
                                                         )}
                                                         
                                                         <div className="flex flex-wrap items-center gap-3 mb-6 relative z-10">
-                                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.05] backdrop-blur-md ${pillBgClass}`}>
+                                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-border backdrop-blur-md ${pillBgClass}`}>
                                                                 <svg className={`w-3.5 h-3.5 ${pillIconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                                                                 <span className={`${pillTextClass} text-[9px] font-bold uppercase tracking-[0.2em]`}>
                                                                     {formatLedgerDate(event.start_date)}
@@ -301,7 +307,7 @@ export default function GlobalPlatformHub() {
                                                             </div>
                                                             
                                                             {event.location && (
-                                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.05] backdrop-blur-md ${pillBgClass}`}>
+                                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-border backdrop-blur-md ${pillBgClass}`}>
                                                                     <svg className={`w-3.5 h-3.5 ${pillIconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                                                     <span className={`${pillTextClass} text-[9px] font-bold uppercase tracking-[0.2em] truncate max-w-[150px]`}>
                                                                         {event.location}
@@ -340,10 +346,10 @@ export default function GlobalPlatformHub() {
                                 {ledgerNodes.length > 0 && (
                                     <div className="w-full flex flex-col relative z-20">
                                         <motion.div layout className="mb-6 px-2 flex items-center justify-between">
-                                            <h2 className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">
+                                            <h2 className="text-[10px] font-bold text-muted-foreground tracking-[0.2em] uppercase">
                                                 Extended Ledger
                                             </h2>
-                                            <div className="h-[1px] flex-grow bg-white/[0.05] ml-6"></div>
+                                            <div className="h-[1px] flex-grow bg-border ml-6"></div>
                                         </motion.div>
                                         
                                         <motion.div layout className="flex flex-col gap-3">
@@ -352,7 +358,7 @@ export default function GlobalPlatformHub() {
                                                     const colorConfig = ledgerColors[index % ledgerColors.length];
                                                     
                                                     const hasImages = event.images && event.images.length > 0;
-                                                    const rowBgClass = hasImages ? 'bg-[#0a0a0c]' : 'bg-white/[0.01] hover:bg-white/[0.03]';
+                                                    const rowBgClass = hasImages ? 'bg-card/90' : 'bg-transparent hover:bg-black/[0.02] dark:hover:bg-white/[0.02]';
 
                                                     return (
                                                         <motion.div 
@@ -365,7 +371,7 @@ export default function GlobalPlatformHub() {
                                                         >
                                                             <Link 
                                                                 href={`/${event.slug}`}
-                                                                className={`group relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 border border-white/[0.05] rounded-[24px] border-l-[3px] border-l-transparent ${colorConfig.border} transition-all duration-300 ease-out hover:shadow-[0_0_30px_rgba(255,255,255,0.02)] ${rowBgClass}`}
+                                                                className={`group relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 border border-border rounded-[24px] border-l-[3px] border-l-transparent ${colorConfig.border} transition-all duration-300 ease-out hover:shadow-sm ${rowBgClass}`}
                                                             >
                                                                 {hasImages && <EventSlideshow images={event.images} />}
 
@@ -375,19 +381,19 @@ export default function GlobalPlatformHub() {
                                                                 
                                                                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 flex-grow relative z-10">
                                                                     <div className="w-32 shrink-0">
-                                                                        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border backdrop-blur-md ${hasImages ? 'bg-white/[0.04] border-white/[0.05] text-zinc-300' : 'bg-white/[0.02] border-white/[0.05] text-zinc-500'}`}>
+                                                                        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border backdrop-blur-md ${hasImages ? 'bg-black/[0.04] dark:bg-white/[0.04] border-border text-foreground/80' : 'bg-transparent border-border text-muted-foreground'}`}>
                                                                             {formatLedgerDate(event.start_date)}
                                                                         </span>
                                                                     </div>
                                                                     
                                                                     <div className="flex flex-col gap-1.5 flex-grow">
-                                                                        <span className={`text-lg font-medium tracking-wide transition-colors ${hasImages ? 'text-white drop-shadow-md' : 'text-zinc-200 group-hover:text-white'}`}>
+                                                                        <span className={`text-lg font-medium tracking-wide transition-colors ${hasImages ? 'text-foreground drop-shadow-md' : 'text-foreground/80 group-hover:text-foreground'}`}>
                                                                             {event.title}
                                                                         </span>
                                                                         {event.location && (
                                                                             <div className="flex items-center gap-1.5">
-                                                                                <svg className={`w-3.5 h-3.5 ${hasImages ? 'text-zinc-400' : 'text-zinc-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                                                <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${hasImages ? 'text-zinc-300 drop-shadow-sm' : 'text-zinc-500'}`}>
+                                                                                <svg className={`w-3.5 h-3.5 ${hasImages ? 'text-muted-foreground' : 'text-muted-foreground/60'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                                                <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${hasImages ? 'text-foreground/80 drop-shadow-sm' : 'text-muted-foreground'}`}>
                                                                                     {event.location}
                                                                                 </span>
                                                                             </div>
@@ -396,7 +402,7 @@ export default function GlobalPlatformHub() {
                                                                 </div>
 
                                                                 <div className="mt-4 sm:mt-0 flex items-center gap-4 sm:gap-6 relative z-10 shrink-0">
-                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-inner ${hasImages ? 'bg-white/[0.08] group-hover:bg-white/[0.2] border border-white/[0.15] text-white' : `bg-white/[0.05] group-hover:bg-white/[0.15] border border-white/[0.1] ${colorConfig.text}`}`}>
+                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-inner ${hasImages ? 'bg-black/[0.08] dark:bg-white/[0.08] group-hover:bg-black/[0.2] dark:group-hover:bg-white/[0.2] border border-border text-foreground' : `bg-black/[0.05] dark:bg-white/[0.05] group-hover:bg-black/[0.15] dark:group-hover:bg-white/[0.15] border border-border ${colorConfig.text}`}`}>
                                                                         <svg className="w-4 h-4 -rotate-45 group-hover:rotate-0 transition-transform duration-300 ease-out" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                                                     </div>
                                                                 </div>

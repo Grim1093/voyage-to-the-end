@@ -50,36 +50,36 @@
 :root {
   /* LOG: Global Light Theme Colors Updated */
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: #F8FAFC; /* Blend Fade: Soft White */
   --foreground: #0F172A; /* Deep Midnight used for text readability */
-  --card: oklch(1 0 0);
+  --card: #F8FAFC;
   --card-foreground: #0F172A;
-  --popover: oklch(1 0 0);
+  --popover: #F8FAFC;
   --popover-foreground: #0F172A;
-  --primary: #2563EB; /* Royal Blue */
-  --primary-foreground: oklch(0.985 0.002 247.839);
-  --secondary: #7C3AED; /* Electric Violet */
-  --secondary-foreground: oklch(0.985 0.002 247.839);
-  --muted: oklch(0.967 0.003 264.542);
-  --muted-foreground: oklch(0.551 0.027 264.364);
-  --accent: #7C3AED; /* Electric Violet for hovering/accents */
-  --accent-foreground: oklch(0.985 0.002 247.839);
+  --primary: #2563EB; /* Main: Sapphire Blue */
+  --primary-foreground: #FFFFFF;
+  --secondary: #38BDF8; /* Accent: Sky Blue */
+  --secondary-foreground: #0F172A;
+  --muted: #E2E8F0;
+  --muted-foreground: #475569;
+  --accent: #38BDF8; /* Accent: Sky Blue for hovering/accents */
+  --accent-foreground: #0F172A;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.928 0.006 264.531);
-  --input: oklch(0.928 0.006 264.531);
-  --ring: #2563EB; /* Royal Blue */
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #2563EB; /* Main: Sapphire Blue */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0.002 247.839);
+  --sidebar: #F8FAFC;
   --sidebar-foreground: #0F172A;
   --sidebar-primary: #2563EB;
-  --sidebar-primary-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-accent: #7C3AED;
-  --sidebar-accent-foreground: oklch(0.985 0.002 247.839);
-  --sidebar-border: oklch(0.928 0.006 264.531);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #38BDF8;
+  --sidebar-accent-foreground: #0F172A;
+  --sidebar-border: #E2E8F0;
   --sidebar-ring: #2563EB;
 }
 
@@ -126,7 +126,7 @@
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-300;
     font-family: var(--font-montserrat), sans-serif;
   }
 
