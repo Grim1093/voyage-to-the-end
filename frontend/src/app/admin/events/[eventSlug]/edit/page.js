@@ -83,6 +83,13 @@ export default function EditEventDeployment() {
         const loadEventData = async () => {
             try {
                 const data = await fetchEventDetails(currentEventSlug);
+
+                // ARCHITECTURE: Immutable Archive Lock - Bounce direct URL access
+                if (data.is_expired) {
+                    console.warn(`${context} Node is archived. Modifications strictly prohibited.`);
+                    router.push(`/admin/${currentEventSlug}`); // Redirect to the read-only ledger
+                    return;
+                }
                 
                 setFormData({
                     name: data.title || '',
@@ -160,7 +167,7 @@ export default function EditEventDeployment() {
         const intervalId = setInterval(pollTelemetry, 10000);
 
         return () => clearInterval(intervalId);
-    }, [currentEventSlug, status, context, router]); // <-- Added router to dependency array
+    }, [currentEventSlug, status, context, router]); 
 
     
     const handleChange = (e) => {

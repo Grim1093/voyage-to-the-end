@@ -186,9 +186,12 @@ export default function MasterDashboard() {
                         <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white text-zinc-300 hover:text-black py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all shadow-inner hover:shadow-none">
                             {event.is_expired ? 'View Ledger' : 'Manage Node'}
                         </Link>
-                        <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        </Link>
+                        {/* ARCHITECTURE: Immutable Archive Lock - Hide Edit button for historical nodes */}
+                        {!event.is_expired && (
+                            <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                            </Link>
+                        )}
                     </div>
                 </div>
             </motion.div>
