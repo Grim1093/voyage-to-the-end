@@ -296,6 +296,37 @@ export const loginGuest = async (eventSlug, email, accessCode) => {
     }
 };
 
+export const logoutAdmin = async () => {
+    const context = `[Frontend API Service - logoutAdmin]`;
+    console.log(`${context} Step 1: Requesting session lock dissolution.`);
+
+    try {
+        const token = getValidToken(context);
+
+        const response = await fetch(`${API_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            console.warn(`${context} Failure Point: Server rejected explicit logout.`, data.message);
+        } else {
+            console.log(`${context} Step 2: Session lock successfully dissolved on backend.`);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error during logout.`, error.message);
+        // We still throw, but the UI should clear the local token anyway just in case.
+        throw error;
+    }
+};
+
 export const resendAccessCode = async (eventSlug, email) => {
     const context = `[Frontend API Service - resendAccessCode - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating code recovery for ${email}`);

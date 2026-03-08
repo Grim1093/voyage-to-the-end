@@ -2,6 +2,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const logger = require('../utils/logger');
+// [Architecture] Required for "Last-In" Session Invalidation
+const { redisClient } = require('../config/cache');
+const { v4: uuidv4 } = require('uuid');
 
 const adminLogin = async (req, res) => {
     const context = 'AuthController - adminLogin';
@@ -37,24 +40,37 @@ const adminLogin = async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid credentials.' });
         }
 
-        // [Architecture] Step 4: Minting the JSON Web Token
-        // We embed the role and ID, and sign it with the Master Secret.
+        // [Architecture] Step 4: Minting the JSON Web Token with Last-In Invalidation
         if (!process.env.JWT_SECRET) {
             logger.error(context, 'CRITICAL FAILURE: JWT_SECRET is missing from the Control Plane environment.');
             return res.status(500).json({ success: false, message: 'Internal server configuration error.' });
         }
 
-        logger.info(context, 'Step 4: Hash verified. Minting authorization token...');
+        // 4a. Generate a unique Session ID
+        const sessionId = uuidv4();
+        
+        // 4b. Write the Session ID to Valkey, locking out any previous sessions for this admin ID
+        if (redisClient) {
+            logger.info(context, `Step 4: Committing single-session lock to Valkey for Admin [${admin.id}]...`);
+            const sessionKey = `admin_session:${admin.id}`;
+            // Set it to expire in exactly 24 hours to match the JWT lifecycle
+            await redisClient.set(sessionKey, sessionId, 'EX', 86400); 
+        } else {
+            logger.warn(context, 'Valkey cache offline. Bypassing single-session lock restriction.');
+        }
+
+        logger.info(context, 'Step 5: Hash verified. Minting authorization token...');
         const tokenPayload = {
             id: admin.id,
             email: admin.email,
-            role: 'superadmin' // Explicit RBAC assignment
+            role: 'superadmin', // Explicit RBAC assignment
+            session_id: sessionId // Injected for middleware validation
         };
 
         // Token expires in 24 hours to enforce security hygiene
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
-        logger.info(context, `Step 5: SUCCESS. Master Control Plane unlocked for ${email}.`);
+        logger.info(context, `Step 6: SUCCESS. Master Control Plane unlocked for ${email}.`);
 
         res.status(200).json({
             success: true,
@@ -72,6 +88,31 @@ const adminLogin = async (req, res) => {
     }
 };
 
+// --- NEW: EXPLICIT LOGOUT PIPELINE ---
+// To clear the Valkey session lock early if the admin explicitly logs out
+const adminLogout = async (req, res) => {
+    const context = 'AuthController - adminLogout';
+    // Requires middleware to have extracted req.admin
+    const adminId = req.admin?.id;
+
+    if (!adminId) {
+        return res.status(400).json({ success: false, message: 'Invalid logout sequence.' });
+    }
+
+    try {
+        if (redisClient) {
+            const sessionKey = `admin_session:${adminId}`;
+            await redisClient.del(sessionKey);
+            logger.info(context, `Admin [${adminId}] voluntarily dissolved their session lock.`);
+        }
+        res.status(200).json({ success: true, message: 'Session securely terminated.' });
+    } catch (error) {
+        logger.error(context, 'Failure Point Auth-Logout: Failed to clear session lock.', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
 module.exports = {
-    adminLogin
+    adminLogin,
+    adminLogout
 };

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchAllAdminEvents, fetchGlobalGuests } from '../../services/api';
+// [Architecture] Import the explicit logout dispatcher
+import { fetchAllAdminEvents, fetchGlobalGuests, logoutAdmin } from '../../services/api';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
 
@@ -34,10 +35,17 @@ export default function MasterDashboard() {
             return true;
         };
 
-        const handleLogout = () => {
+        const handleLogout = async () => {
             console.log(`${context} Action: Session purged due to inactivity.`);
-            localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
-            router.push('/admin/login');
+            try {
+                // Dissolve the Valkey lock first
+                await logoutAdmin();
+            } catch (err) {
+                console.warn(`${context} Network fail during inactivity logout, purging local token regardless.`);
+            } finally {
+                localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
+                router.push('/admin/login');
+            }
         };
 
         const resetInactivityTimer = () => {
@@ -73,8 +81,9 @@ export default function MasterDashboard() {
             setStatus('success');
         } catch (error) {
             console.error(`${context} Failure fetching tenants:`, error);
-            // If the fetch fails because the token expired, bounce them out
-            if (error.message.includes('401') || error.message.includes('403')) {
+            // ARCHITECT NOTE: Check for explicit security messages instead of just status codes
+            const msg = error.message.toLowerCase();
+            if (msg.includes('401') || msg.includes('403') || msg.includes('session') || msg.includes('unauthorized')) {
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             } else {
@@ -91,7 +100,8 @@ export default function MasterDashboard() {
             setStatus('success');
         } catch (error) {
             console.error(`${context} Failure fetching global guests:`, error);
-            if (error.message.includes('401') || error.message.includes('403')) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes('401') || msg.includes('403') || msg.includes('session') || msg.includes('unauthorized')) {
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             } else {
@@ -100,9 +110,16 @@ export default function MasterDashboard() {
         }
     };
 
-    const handleLockVault = () => {
-        localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT on manual lock
-        router.push('/admin/login');
+    const handleLockVault = async () => {
+        try {
+            // [Architecture] Dissolve the Valkey lock to free up the concurrent session limit
+            await logoutAdmin();
+        } catch (err) {
+             console.warn(`${context} Network fail during explicit logout, purging local token regardless.`);
+        } finally {
+            localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
+            router.push('/admin/login');
+        }
     };
 
     const renderStateBadge = (state) => {

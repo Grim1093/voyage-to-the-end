@@ -115,6 +115,15 @@ export default function EditEventDeployment() {
                 setStatus('idle');
             } catch (error) {
                 console.error(`${context} Failed to fetch event details.`, error);
+
+                // ARCHITECT NOTE: Security Bounce Check
+                const msg = error.message.toLowerCase();
+                if (msg.includes('session') || msg.includes('unauthorized')) {
+                    localStorage.removeItem('adminToken');
+                    router.push('/admin/login');
+                    return;
+                }
+
                 setStatus('error');
                 setMessage('Could not load event data. It may have been deleted.');
             }
@@ -134,7 +143,14 @@ export default function EditEventDeployment() {
                 const data = await fetchEventTelemetry(currentEventSlug);
                 setTelemetry(data);
             } catch (error) {
-                console.warn(`${context} Telemetry poll failed.`);
+                console.warn(`${context} Telemetry poll failed.`, error.message);
+                
+                // ARCHITECT NOTE: If telemetry fails because the token was revoked, bounce them out instantly!
+                const msg = error.message.toLowerCase();
+                if (msg.includes('session') || msg.includes('unauthorized')) {
+                    localStorage.removeItem('adminToken');
+                    router.push('/admin/login');
+                }
             }
         };
 
@@ -144,8 +160,9 @@ export default function EditEventDeployment() {
         const intervalId = setInterval(pollTelemetry, 10000);
 
         return () => clearInterval(intervalId);
-    }, [currentEventSlug, status, context]);
+    }, [currentEventSlug, status, context, router]); // <-- Added router to dependency array
 
+    
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFormData({
