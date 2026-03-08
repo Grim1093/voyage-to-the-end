@@ -2,6 +2,8 @@ const db = require('../config/db');
 const logger = require('../utils/logger');
 // [Architecture] Importing the Automated Edge Deployment Service
 const vercelService = require('../services/vercelService');
+// [Architecture] Importing the Engine Telemetry for Vector 2
+const { getMeshTelemetry } = require('./abyssController');
 
 // --- READ PIPELINES ---
 
@@ -65,9 +67,10 @@ const getAllAdminEvents = async (req, res) => {
 const getEventBySlug = async (req, res) => {
     const context = 'EventController - getEventBySlug';
     const { eventSlug } = req.params;
-    logger.info(context, `Fetching details for event: ${eventSlug}`);
+    logger.info(context, `Fetching details and schedule for event: ${eventSlug}`);
 
     try {
+        // ARCHITECT NOTE: The query now automatically resolves the temporal itinerary engine (event_schedules)
         const query = `
             SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
                    e.custom_domain, e.theme_config,
@@ -75,7 +78,19 @@ const getEventBySlug = async (req, res) => {
                    COALESCE(
                        (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
                         FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
-                   ) as images
+                   ) as images,
+                   COALESCE(
+                       (SELECT json_agg(json_build_object(
+                           'id', es.id,
+                           'title', es.title,
+                           'description', es.description,
+                           'speaker_name', es.speaker_name,
+                           'location', es.location,
+                           'start_time', es.start_time,
+                           'end_time', es.end_time
+                       ) ORDER BY es.start_time ASC) 
+                        FROM event_schedules es WHERE es.event_id = e.id), '[]'::json
+                   ) as schedule
             FROM events e
             WHERE e.slug = $1;
         `;
@@ -125,6 +140,212 @@ const getEventByDomain = async (req, res) => {
     } catch (error) {
         logger.error(context, `Failure Point EV-Domain-Crit: CRITICAL FAILURE resolving domain ${hostname}.`, error);
         res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+};
+
+// --- ITINERARY ENGINE (SCHEDULE) PIPELINES ---
+
+const getEventSchedule = async (req, res) => {
+    const context = 'EventController - getEventSchedule';
+    const { eventSlug } = req.params;
+    logger.info(context, `Step 1: Fetching raw itinerary for tenant: ${eventSlug}`);
+
+    try {
+        const query = `
+            SELECT es.id, es.title, es.description, es.speaker_name, es.location, es.start_time, es.end_time 
+            FROM event_schedules es
+            JOIN events e ON es.event_id = e.id
+            WHERE e.slug = $1
+            ORDER BY es.start_time ASC;
+        `;
+        
+        const result = await db.query(query, [eventSlug]);
+
+        res.status(200).json({
+            success: true,
+            data: result.rows
+        });
+    } catch (error) {
+        logger.error(context, `Failure Point EV-SCH-1: CRITICAL FAILURE fetching schedule for ${eventSlug}.`, error);
+        res.status(500).json({ success: false, message: 'Internal server error fetching schedule.' });
+    }
+};
+
+const updateEventSchedule = async (req, res) => {
+    const context = 'EventController - updateEventSchedule';
+    const { eventSlug } = req.params;
+    const { schedule } = req.body; // Expects an array of schedule items
+    
+    logger.info(context, `Step 1: Admin initiating Master Itinerary Override for tenant: ${eventSlug}`);
+
+    const client = await db.connect();
+
+    try {
+        await client.query('BEGIN'); // Start atomic transaction
+
+        // 1. Resolve slug to Event ID
+        const eventQuery = `SELECT id FROM events WHERE slug = $1;`;
+        const eventResult = await client.query(eventQuery, [eventSlug]);
+
+        if (eventResult.rowCount === 0) {
+            await client.query('ROLLBACK');
+            logger.warn(context, `Failure Point EV-SCH-2: Target tenant not found: ${eventSlug}`);
+            return res.status(404).json({ success: false, message: 'Event not found.' });
+        }
+
+        const eventId = eventResult.rows[0].id;
+
+        // 2. Erase existing schedule (Atomic wipe)
+        logger.info(context, `Step 2: Purging legacy temporal data...`);
+        await client.query(`DELETE FROM event_schedules WHERE event_id = $1;`, [eventId]);
+
+        // 3. Inject new schedule items
+        if (schedule && Array.isArray(schedule) && schedule.length > 0) {
+            logger.info(context, `Step 3: Injecting ${schedule.length} new temporal nodes into the ledger...`);
+            
+            for (const item of schedule) {
+                const insertQuery = `
+                    INSERT INTO event_schedules (event_id, title, description, speaker_name, location, start_time, end_time)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `;
+                // Architect Note: The DB enforces absolute UTC. Ensure frontend passes ISO 8601 strings.
+                await client.query(insertQuery, [
+                    eventId, 
+                    item.title, 
+                    item.description || null, 
+                    item.speaker_name || null, 
+                    item.location || null, 
+                    item.start_time, 
+                    item.end_time
+                ]);
+            }
+        }
+
+        await client.query('COMMIT'); // Seal the transaction
+        logger.info(context, `Step 4: Master Itinerary successfully synchronized.`);
+
+        res.status(200).json({
+            success: true,
+            message: 'Schedule successfully updated.'
+        });
+
+    } catch (error) {
+        await client.query('ROLLBACK'); // Abort on any failure to maintain data integrity
+        logger.error(context, `Failure Point EV-SCH-3: Transaction severed during schedule sync for ${eventSlug}.`, error);
+        res.status(500).json({ success: false, message: 'Internal server error during schedule sync.' });
+    } finally {
+        client.release();
+    }
+};
+
+// --- VECTOR 2: TELEMETRY & KILL SWITCH ---
+
+const getEventTelemetry = async (req, res) => {
+    const context = `EventController - getEventTelemetry`;
+    const { eventSlug } = req.params;
+    
+    logger.info(context, `Step 1: Admin requesting live telemetry for node ${eventSlug}...`);
+
+    try {
+        const eventQuery = `SELECT id FROM events WHERE slug = $1;`;
+        const eventResult = await db.query(eventQuery, [eventSlug]);
+
+        if (eventResult.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Event not found.' });
+        }
+
+        const eventId = eventResult.rows[0].id;
+        const io = req.app.get('io'); // Retrieve the mounted Socket.io instance
+        
+        // Execute the telemetry ping across the horizontal Valkey cluster
+        const telemetry = await getMeshTelemetry(io, eventId);
+
+        if (!telemetry.success) {
+            throw new Error(telemetry.error);
+        }
+
+        // We can also fetch the total registered guests to provide a ratio
+        const registeredQuery = `SELECT COUNT(*) FROM event_registrations WHERE event_id = $1 AND current_state = 2;`;
+        const registeredResult = await db.query(registeredQuery, [eventId]);
+        const totalRegistered = parseInt(registeredResult.rows[0].count, 10);
+
+        res.status(200).json({
+            success: true,
+            data: {
+                activeConnections: telemetry.activeConnections,
+                totalRegisteredVerified: totalRegistered
+            }
+        });
+
+    } catch (error) {
+        logger.error(context, `Failure Point EV-TEL: Failed to extract live telemetry.`, error);
+        res.status(500).json({ success: false, message: 'Internal server error extracting telemetry.' });
+    }
+};
+
+const dissolveEventMesh = async (req, res) => {
+    const context = 'EventController - dissolveEventMesh';
+    const { eventSlug } = req.params;
+
+    logger.warn(context, `!!! CRITICAL COMMAND RECEIVED: Admin initiated THE DISSOLVE for Node [${eventSlug}] !!!`);
+
+    try {
+        const eventQuery = `SELECT id, name FROM events WHERE slug = $1;`;
+        const eventResult = await db.query(eventQuery, [eventSlug]);
+
+        if (eventResult.rowCount === 0) {
+            return res.status(404).json({ success: false, message: 'Event not found.' });
+        }
+
+        const eventId = eventResult.rows[0].id;
+        const eventName = eventResult.rows[0].name;
+        const io = req.app.get('io');
+        const { redisClient } = require('../config/cache');
+
+        // 1. Terminate all active Socket connections
+        logger.info(context, `Step 1: Severing all active WebSockets for Node [${eventId}]...`);
+        const meshRoom = `node:${eventId}:abyss`;
+        const sockets = await io.in(meshRoom).fetchSockets();
+        
+        // Inform clients of the forced ejection before dropping them
+        io.to(meshRoom).emit('mesh_dissolved', { message: 'The event has concluded. The mesh is permanently dissolved.' });
+        
+        sockets.forEach(socket => {
+            socket.disconnect(true);
+        });
+
+        // 2. Wipe the presence cache in Valkey
+        if (redisClient) {
+            logger.info(context, `Step 2: Purging Ephemeral Node State from Valkey...`);
+            const presenceKey = `abyss:node:${eventId}:online`;
+            await redisClient.del(presenceKey);
+        }
+
+        // 3. Mark the event as expired in the Global Ledger
+        logger.info(context, `Step 3: Committing temporal archive stamp to Global Ledger...`);
+        const archiveQuery = `UPDATE events SET end_date = CURRENT_TIMESTAMP WHERE id = $1;`;
+        await db.query(archiveQuery, [eventId]);
+
+        // 4. Trigger the Background Worker for Final Export
+        // Note: Instead of doing it synchronously and blocking the request, we trigger it 
+        // to run in the background. If you have a dedicated queue (like BullMQ), you'd use that here.
+        // For zero-cost setup, we execute an async function without awaiting it.
+        logger.info(context, `Step 4: Arming background worker to dispatch Mesh Exports...`);
+        const { processMeshExportForEvent } = require('../services/meshDissolver'); // You may need to create this specific function in meshDissolver.js
+        processMeshExportForEvent(eventId, eventName).catch(err => {
+            logger.error(context, `BACKGROUND WORKER FAILURE: Mesh Export failed.`, err);
+        });
+
+        logger.info(context, `!!! DISSOLVE COMPLETE. Node [${eventSlug}] is archived. !!!`);
+
+        res.status(200).json({
+            success: true,
+            message: 'The Ephemeral Mesh has been permanently dissolved.'
+        });
+
+    } catch (error) {
+        logger.error(context, `Failure Point EV-DISSOLVE: The Kill Switch failed to execute properly.`, error);
+        res.status(500).json({ success: false, message: 'Internal server error during mesh dissolution.' });
     }
 };
 
@@ -371,6 +592,10 @@ module.exports = {
     getAllAdminEvents,
     getEventBySlug,
     getEventByDomain,
+    getEventSchedule,       
+    updateEventSchedule,    
+    getEventTelemetry,    // NEW: Vector 2 
+    dissolveEventMesh,    // NEW: Vector 2 (The Kill Switch)
     createEvent,
     updateEvent,
     deleteEvent

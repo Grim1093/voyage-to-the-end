@@ -239,4 +239,27 @@ const registerAbyssHandlers = (io, socket) => {
     });
 };
 
-module.exports = { registerAbyssHandlers };
+// --- ARCHITECTURE: ADMIN TELEMETRY ---
+// Fetches the exact number of active WebSockets in a specific event room, scaling across all Redis nodes.
+const getMeshTelemetry = async (io, eventId) => {
+    const context = `[Telemetry - Node ${eventId}]`;
+    const meshRoom = `node:${eventId}:abyss`;
+    
+    try {
+        // io.in(room).fetchSockets() returns an array of Socket instances currently in the room.
+        // Because we use the Redis adapter, this automatically queries all clustered servers if scaled horizontally.
+        const sockets = await io.in(meshRoom).fetchSockets();
+        const activeConnections = sockets.length;
+        
+        console.log(`${context} Telemetry sync successful. Active connections: ${activeConnections}`);
+        return { success: true, activeConnections };
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Engine telemetry extraction failed.`, error.message);
+        return { success: false, activeConnections: 0, error: error.message };
+    }
+};
+
+module.exports = { 
+    registerAbyssHandlers,
+    getMeshTelemetry 
+};

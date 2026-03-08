@@ -3,6 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ARCHITECT NOTE: Clearing the old architecture
 -- CASCADE ensures any old dependencies are also cleanly wiped
+DROP TABLE IF EXISTS event_schedules CASCADE;
 DROP TABLE IF EXISTS event_registrations CASCADE;
 DROP TABLE IF EXISTS guests CASCADE;
 
@@ -46,4 +47,27 @@ CREATE TABLE event_registrations (
     
     -- ARCHITECT NOTE: Prevent a guest from registering for the exact same event twice!
     UNIQUE(guest_id, event_id)
+);
+
+-- ==========================================
+-- 3. THE ITINERARY ENGINE (EVENT SCHEDULES)
+-- ==========================================
+CREATE TABLE event_schedules (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    
+    -- Relational Links
+    event_id INT REFERENCES events(id) ON DELETE CASCADE,
+    
+    -- Temporal Core Data
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    speaker_name VARCHAR(255),
+    location VARCHAR(255),
+    
+    -- ARCHITECT NOTE: Strict UTC enforcement. The MSaaS Edge/Client will localize this.
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

@@ -113,4 +113,6 @@ module.exports = {
     pool,
     connectDB,
     query: (text, params) => pool.query(text, params),
+    // ARCHITECT NOTE: Exporting the raw connection lease function for atomic transactions
+    connect: () => pool.connect() 
 };
