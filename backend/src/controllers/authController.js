@@ -19,7 +19,8 @@ const adminLogin = async (req, res) => {
         }
 
         // [Architecture] Step 2: Query the Global Ledger for the Admin identity
-        const query = `SELECT id, email, password_hash FROM admins WHERE email = $1;`;
+        // ARCHITECT NOTE: Upgraded to extract role and organization_id for RBAC Token Minting
+        const query = `SELECT id, email, password_hash, role, organization_id FROM admins WHERE email = $1;`;
         const result = await db.query(query, [email]);
 
         if (result.rowCount === 0) {
@@ -59,18 +60,19 @@ const adminLogin = async (req, res) => {
             logger.warn(context, 'Valkey cache offline. Bypassing single-session lock restriction.');
         }
 
-        logger.info(context, 'Step 5: Hash verified. Minting authorization token...');
+        logger.info(context, `Step 5: Hash verified. Minting authorization token for [${admin.role}]...`);
         const tokenPayload = {
             id: admin.id,
             email: admin.email,
-            role: 'superadmin', // Explicit RBAC assignment
+            role: admin.role, // Dynamically mapped from the DB
+            organization_id: admin.organization_id, // Vital for Tenant Sandboxing
             session_id: sessionId // Injected for middleware validation
         };
 
         // Token expires in 24 hours to enforce security hygiene
         const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { expiresIn: '24h' });
 
-        logger.info(context, `Step 6: SUCCESS. Master Control Plane unlocked for ${email}.`);
+        logger.info(context, `Step 6: SUCCESS. Node unlocked for ${email}.`);
 
         res.status(200).json({
             success: true,
@@ -78,7 +80,8 @@ const adminLogin = async (req, res) => {
             token: token,
             admin: {
                 id: admin.id,
-                email: admin.email
+                email: admin.email,
+                role: admin.role
             }
         });
 

@@ -38,7 +38,7 @@ v2NVgg==
     }
 });
 
-// [Architecture] Automated Database Migrations
+// [Architecture] Automated Database Migrations (Phase 3: RBAC Evolution)
 const runMigrations = async () => {
     const context = 'DB-Migration-Tool';
     const client = await pool.connect();
@@ -46,7 +46,44 @@ const runMigrations = async () => {
     try {
         logger.info(context, 'Step 1: Checking Abyss ledger architecture...');
 
-        // Create the Global Echos table. 
+        await client.query('BEGIN'); // Start transaction for structural integrity
+
+        // --- 1. THE TENANT LEDGER ---
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS organizations (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL UNIQUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
+        // --- 2. UPGRADING ADMIN IDENTITIES ---
+        // We add roles and link them to organizations. 
+        // Existing admins default to 'superadmin' so you don't lock yourself out.
+        await client.query(`
+            ALTER TABLE admins 
+            ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'superadmin',
+            ADD COLUMN IF NOT EXISTS organization_id INT REFERENCES organizations(id) ON DELETE SET NULL;
+        `);
+
+        // --- 3. LINKING EVENTS TO TENANTS ---
+        await client.query(`
+            ALTER TABLE events 
+            ADD COLUMN IF NOT EXISTS organization_id INT REFERENCES organizations(id) ON DELETE CASCADE;
+        `);
+
+        // --- 4. GROUND NODE (STAFF) AUTHORIZATION MAPPING ---
+        // Architect Note: admin_id changed to UUID to perfectly map the admins table schema
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS event_staff_assignments (
+                admin_id UUID REFERENCES admins(id) ON DELETE CASCADE,
+                event_id INT REFERENCES events(id) ON DELETE CASCADE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (admin_id, event_id)
+            );
+        `);
+
+        // --- 5. THE EPHEMERAL MESH (Existing) ---
         await client.query(`
             CREATE TABLE IF NOT EXISTS direct_messages (
                 id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -62,15 +99,16 @@ const runMigrations = async () => {
             CREATE INDEX IF NOT EXISTS idx_dm_participants ON direct_messages(event_id, sender_id, receiver_id);
         `);
 
-        logger.info(context, 'Step 2: Abyss ledger architecture verified and ready.');
+        await client.query('COMMIT');
+        logger.info(context, 'Step 2: RBAC & Abyss ledger architecture verified and ready.');
 
     } catch (error) {
+        await client.query('ROLLBACK');
         logger.error(context, 'Failure Point DB-MIGRATE: Schema migration failed.', error);
     } finally {
         client.release();
     }
 };
-
 const runSequenceSync = async () => {
     const context = 'DB-Sync-Tool';
     const client = await pool.connect();

@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log("Currently connected DB:", process.env.DATABASE_URL);
 const express = require('express');
 const http = require('http'); // [Architecture] Required to mount WebSockets alongside Express
 const { Server } = require('socket.io'); // [Architecture] The Abyss Transport Layer
@@ -144,6 +145,11 @@ try {
     const eventRoutes = require('./routes/eventRoutes');
     app.use('/api/events', eventRoutes);
     console.log('[Router] Step 12: Master Event routing mounted at /api/events');
+
+    // [Architecture] Phase 5: Mounting the Tenant Provisioning API
+    const tenantRoutes = require('./routes/tenantRoutes');
+    app.use('/api/tenants', tenantRoutes);
+    console.log('[Router] Step 12.5: Tenant Organization routing mounted at /api/tenants');
 } catch (error) {
     console.error('[Router] Failure Point B: Failed to mount routing modules.', error);
     process.exit(1);

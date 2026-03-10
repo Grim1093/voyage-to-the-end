@@ -2,16 +2,17 @@ const express = require('express');
 const router = express.Router();
 const guestController = require('../controllers/guestController');
 const logger = require('../utils/logger');
-// [Architecture] Imported the new Guest Bouncer alongside the Admin Gatekeeper
-const { requireAdminKey, requireGuestToken } = require('../middleware/authMiddleware');
+// [Architecture] Imported the new RBAC Bouncers alongside the Guest Token Shield
+const { requireSuperadmin, requireTenantAdmin, requireEventStaff, requireGuestToken } = require('../middleware/authMiddleware');
 
 /**
  * Route: GET /api/guests/admin/all
- * Purpose: Fetch ALL global identities and their aggregated events for the Master Admin Dashboard.
+ * Purpose: Fetch global identities and their aggregated events for the Master Admin Dashboard.
  * ARCHITECT NOTE: Placed at the very top to prevent route collision with /:eventSlug!
+ * Clearance: Level 1 (Tenant Admin - Controller inherently handles sandbox isolation)
  */
-router.get('/admin/all', requireAdminKey, (req, res) => {
-    logger.info('GuestRoutes', 'Incoming GET request for Global Guest Directory.');
+router.get('/admin/all', requireTenantAdmin, (req, res) => {
+    logger.info('GuestRoutes', 'Incoming GET request for Guest Directory.');
     guestController.getGlobalGuests(req, res);
 });
 
@@ -101,27 +102,30 @@ router.get('/:eventSlug/:id/status', requireGuestToken, (req, res) => {
 
 /**
  * Route: GET /api/guests/:eventSlug
- * Purpose: Retrieves a paginated list of guests for a specific event. Strictly Admin.
+ * Purpose: Retrieves a paginated list of guests for a specific event.
+ * Clearance: Level 2 (Event Staff)
  */
-router.get('/:eventSlug', requireAdminKey, (req, res) => {
+router.get('/:eventSlug', requireEventStaff, (req, res) => {
     logger.info('GuestRoutes', `Incoming GET request to fetch guest ledger for event: ${req.params.eventSlug}. Query params: ${JSON.stringify(req.query)}`);
     guestController.getAllGuests(req, res);
 });
 
 /**
  * Route: GET /api/guests/:eventSlug/:id
- * Purpose: Lazy-loads the extended details (PII) of a specific guest for the Admin Vault. Strictly Admin.
+ * Purpose: Lazy-loads the extended details (PII) of a specific guest for the Admin Vault.
+ * Clearance: Level 2 (Event Staff)
  */
-router.get('/:eventSlug/:id', requireAdminKey, (req, res) => {
+router.get('/:eventSlug/:id', requireEventStaff, (req, res) => {
     logger.info('GuestRoutes', `Incoming GET request to fetch extended details for guest ${req.params.id} at event: ${req.params.eventSlug}`);
     guestController.getGuestById(req, res);
 });
 
 /**
  * Route: PATCH /api/guests/:eventSlug/:id/state
- * Purpose: Updates the verification state (0, 1, 2, -1) of a specific guest within an event. Strictly Admin.
+ * Purpose: Updates the verification state (0, 1, 2, -1) of a specific guest within an event.
+ * Clearance: Level 2 (Event Staff)
  */
-router.patch('/:eventSlug/:id/state', requireAdminKey, (req, res) => {
+router.patch('/:eventSlug/:id/state', requireEventStaff, (req, res) => {
     logger.info('GuestRoutes', `Incoming PATCH request to update state for guest ${req.params.id} at event: ${req.params.eventSlug}`);
     guestController.updateGuestState(req, res);
 });

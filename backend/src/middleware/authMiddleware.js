@@ -4,67 +4,104 @@ const logger = require('../utils/logger');
 const { redisClient } = require('../config/cache'); 
 require('dotenv').config(); 
 
-const requireAdminKey = async (req, res, next) => {
-    const context = 'AuthMiddleware - Admin';
-    logger.info(context, `Step 1: Intercepted request to protected admin route: ${req.originalUrl}`);
-
+// --- ARCHITECTURE: CORE SESSION VALIDATOR ---
+// This internal function handles the heavy lifting of decrypting the token 
+// and enforcing the "Last-In" concurrent session lock via Valkey.
+const validateAdminSession = async (req, context) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        logger.warn(context, 'Access Denied (Failure Point H): Missing or malformed Bearer token.');
-        return res.status(401).json({ 
-            success: false, 
-            message: 'Unauthorized: Cryptographic token required.' 
-        });
+        logger.warn(context, 'Access Denied: Missing or malformed Bearer token.');
+        throw { status: 401, message: 'Unauthorized: Cryptographic token required.' };
     }
 
     const token = authHeader.split(' ')[1];
     const secret = process.env.JWT_SECRET;
 
     if (!secret) {
-        logger.error(context, 'CRITICAL FAILURE (Failure Point J): JWT_SECRET is not defined in the Control Plane environment!');
-        return res.status(500).json({ 
-            success: false, 
-            message: 'Internal Server Error: Security configuration missing.' 
-        });
+        logger.error(context, 'CRITICAL FAILURE: JWT_SECRET is not defined in the Control Plane environment!');
+        throw { status: 500, message: 'Internal Server Error: Security configuration missing.' };
     }
 
     try {
         const decoded = jwt.verify(token, secret);
 
-        if (decoded.role !== 'superadmin') {
-            logger.warn(context, `Access Denied (Failure Point K): Valid token, but insufficient privileges for ${decoded.email}.`);
-            return res.status(403).json({ 
-                success: false, 
-                message: 'Forbidden: Insufficient clearance.' 
-            });
-        }
-
-        // [Architecture] Step 1.5: "Last-In" Concurrent Session Validation
+        // [Architecture] "Last-In" Concurrent Session Validation
         if (redisClient) {
             const sessionKey = `admin_session:${decoded.id}`;
             const activeSessionId = await redisClient.get(sessionKey);
 
-            // If the token's session ID doesn't match Valkey, or Valkey is empty (logged out)
             if (!activeSessionId || activeSessionId !== decoded.session_id) {
-                logger.warn(context, `SECURITY TRIGGER: Revoked token detected for ${decoded.email}. Session was overridden by a newer login.`);
-                return res.status(401).json({
-                    success: false,
-                    message: 'Session Expired: You have logged in from another device. Please authenticate again.'
-                });
+                logger.warn(context, `SECURITY TRIGGER: Revoked token detected for ${decoded.email}. Session overridden by a newer login.`);
+                throw { status: 401, message: 'Session Expired: You have logged in from another device. Please authenticate again.' };
             }
         }
 
-        logger.info(context, `Step 6: Signature verified. Access granted to Superadmin: ${decoded.email}`);
+        return decoded;
+    } catch (error) {
+        if (error.status) throw error; // Re-throw our custom errors
+        logger.warn(context, `Access Denied: Token verification failed - ${error.message}`);
+        throw { status: 403, message: 'Forbidden: Invalid or expired token.' };
+    }
+};
+
+// --- LEVEL 0: THE MASTER CONTROL ---
+const requireSuperadmin = async (req, res, next) => {
+    const context = 'AuthMiddleware - Superadmin';
+    try {
+        const decoded = await validateAdminSession(req, context);
+
+        if (decoded.role !== 'superadmin') {
+            logger.warn(context, `Access Denied: Valid token, but insufficient privileges for ${decoded.email}.`);
+            return res.status(403).json({ success: false, message: 'Forbidden: Insufficient clearance. Superadmin required.' });
+        }
+
+        logger.info(context, `Signature verified. Access granted to Superadmin: ${decoded.email}`);
         req.admin = decoded;
         next();
-
     } catch (error) {
-        logger.warn(context, `Access Denied (Failure Point I): Token verification failed - ${error.message}`);
-        return res.status(403).json({ 
-            success: false, 
-            message: 'Forbidden: Invalid or expired token.' 
-        });
+        res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+};
+
+// --- LEVEL 1: THE ORGANIZER ---
+const requireTenantAdmin = async (req, res, next) => {
+    const context = 'AuthMiddleware - TenantAdmin';
+    try {
+        const decoded = await validateAdminSession(req, context);
+
+        // Superadmins can do everything a Tenant Admin can do
+        if (decoded.role !== 'tenant_admin' && decoded.role !== 'superadmin') {
+            logger.warn(context, `Access Denied: Valid token, but insufficient privileges for ${decoded.email}.`);
+            return res.status(403).json({ success: false, message: 'Forbidden: Insufficient clearance. Tenant Admin required.' });
+        }
+
+        logger.info(context, `Signature verified. Access granted to Admin: ${decoded.email}`);
+        req.admin = decoded;
+        next();
+    } catch (error) {
+        res.status(error.status || 500).json({ success: false, message: error.message });
+    }
+};
+
+// --- LEVEL 2: THE GROUND NODE ---
+const requireEventStaff = async (req, res, next) => {
+    const context = 'AuthMiddleware - EventStaff';
+    try {
+        const decoded = await validateAdminSession(req, context);
+
+        // Cascade clearance: Super -> Tenant -> Staff
+        const validRoles = ['staff', 'tenant_admin', 'superadmin'];
+        if (!validRoles.includes(decoded.role)) {
+            logger.warn(context, `Access Denied: Valid token, but insufficient privileges for ${decoded.email}.`);
+            return res.status(403).json({ success: false, message: 'Forbidden: Insufficient clearance. Event Staff required.' });
+        }
+
+        logger.info(context, `Signature verified. Access granted to Staff: ${decoded.email}`);
+        req.admin = decoded;
+        next();
+    } catch (error) {
+        res.status(error.status || 500).json({ success: false, message: error.message });
     }
 };
 
@@ -120,6 +157,8 @@ const requireGuestToken = (req, res, next) => {
 };
 
 module.exports = {
-    requireAdminKey,
-    requireGuestToken
+    requireSuperadmin,     // Level 0
+    requireTenantAdmin,    // Level 1
+    requireEventStaff,     // Level 2
+    requireGuestToken      // Guest Boundary
 };
