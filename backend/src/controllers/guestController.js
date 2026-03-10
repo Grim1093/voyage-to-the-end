@@ -6,22 +6,51 @@ const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 const { redisClient } = require('../config/cache');
 
-// ARCHITECT NOTE: Upgraded helper to return both ID and Name to support dynamic multi-tenant emails.
+// --- HELPER: TENANT & STAFF SANDBOX ---
+// Verifies if the Admin has clearance to view/edit guests for this specific event.
+const checkEventClearance = async (admin, eventId, context) => {
+    if (admin.role === 'superadmin') return true;
+
+    if (admin.role === 'tenant_admin') {
+        const query = `SELECT id FROM events WHERE id = $1 AND organization_id = $2;`;
+        const result = await db.query(query, [eventId, admin.organization_id]);
+        if (result.rowCount === 0) {
+            logger.warn(context, `SECURITY: TenantAdmin [${admin.email}] blocked from Event [${eventId}]`);
+            return false;
+        }
+        return true;
+    }
+
+    if (admin.role === 'staff') {
+        const query = `SELECT event_id FROM event_staff_assignments WHERE admin_id = $1 AND event_id = $2;`;
+        const result = await db.query(query, [admin.id, eventId]);
+        if (result.rowCount === 0) {
+            logger.warn(context, `SECURITY: EventStaff [${admin.email}] blocked from Event [${eventId}]`);
+            return false;
+        }
+        return true;
+    }
+
+    return false;
+};
+
+// ARCHITECT NOTE: Upgraded helper to return ID, Name, and Org to support dynamic emails and RBAC.
 const getEventBySlug = async (slug, context) => {
-    const result = await db.query('SELECT id, name FROM events WHERE slug = $1', [slug]);
+    const result = await db.query('SELECT id, name, organization_id FROM events WHERE slug = $1', [slug]);
     if (result.rowCount === 0) {
         logger.warn(context, `Failure Point E1: Event slug not found in database: ${slug}`);
         return null;
     }
     return {
         id: result.rows[0].id,
-        name: result.rows[0].name
+        name: result.rows[0].name,
+        organization_id: result.rows[0].organization_id
     };
 };
 
 const getGlobalGuests = async (req, res) => {
     const context = 'GuestController - getGlobalGuests';
-    logger.info(context, 'Master Admin fetching Global Guest Directory.');
+    logger.info(context, `Admin [${req.admin?.email}] fetching Guest Directory. Role: ${req.admin?.role}`);
 
     try {
         const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -30,34 +59,76 @@ const getGlobalGuests = async (req, res) => {
         
         const offset = (page - 1) * limit;
 
-        const fetchQuery = `
-            SELECT 
-                g.id, 
-                g.full_name, 
-                g.email, 
-                g.phone,
-                g.created_at,
-                COALESCE(
-                    json_agg(
-                        json_build_object(
-                            'title', e.name,
-                            'slug', e.slug,
-                            'state', er.current_state
-                        )
-                    ) FILTER (WHERE e.id IS NOT NULL), '[]'
-                ) as registered_events
-            FROM guests g
-            LEFT JOIN event_registrations er ON g.id = er.guest_id
-            LEFT JOIN events e ON er.event_id = e.id
-            GROUP BY g.id
-            ORDER BY g.created_at DESC
-            LIMIT $1 OFFSET $2;
-        `;
-        
-        const countQuery = `SELECT COUNT(*) FROM guests;`;
+        let fetchQuery;
+        let countQuery;
+        let queryParams = [limit, offset];
+        let countParams = [];
 
-        const result = await db.query(fetchQuery, [limit, offset]);
-        const countResult = await db.query(countQuery);
+        // [Architecture] Dynamic RBAC Query Branching
+        if (req.admin.role === 'superadmin') {
+            // Master Ledger: See everyone, and all their events across all sandboxes.
+            fetchQuery = `
+                SELECT 
+                    g.id, 
+                    g.full_name, 
+                    g.email, 
+                    g.phone,
+                    g.created_at,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'title', e.name,
+                                'slug', e.slug,
+                                'state', er.current_state
+                            )
+                        ) FILTER (WHERE e.id IS NOT NULL), '[]'
+                    ) as registered_events
+                FROM guests g
+                LEFT JOIN event_registrations er ON g.id = er.guest_id
+                LEFT JOIN events e ON er.event_id = e.id
+                GROUP BY g.id
+                ORDER BY g.created_at DESC
+                LIMIT $1 OFFSET $2;
+            `;
+            countQuery = `SELECT COUNT(*) FROM guests;`;
+        } else {
+            // Tenant Sandbox: See ONLY guests registered to your events, 
+            // and ONLY see your events in their registration payload to prevent intel leaks.
+            fetchQuery = `
+                SELECT 
+                    g.id, 
+                    g.full_name, 
+                    g.email, 
+                    g.phone,
+                    g.created_at,
+                    COALESCE(
+                        json_agg(
+                            json_build_object(
+                                'title', e.name,
+                                'slug', e.slug,
+                                'state', er.current_state
+                            )
+                        ), '[]'
+                    ) as registered_events
+                FROM guests g
+                JOIN event_registrations er ON g.id = er.guest_id
+                JOIN events e ON er.event_id = e.id AND e.organization_id = $3
+                GROUP BY g.id, g.full_name, g.email, g.phone, g.created_at
+                ORDER BY g.created_at DESC
+                LIMIT $1 OFFSET $2;
+            `;
+            countQuery = `
+                SELECT COUNT(DISTINCT g.id) 
+                FROM guests g
+                JOIN event_registrations er ON g.id = er.guest_id
+                JOIN events e ON er.event_id = e.id AND e.organization_id = $1;
+            `;
+            queryParams.push(req.admin.organization_id);
+            countParams.push(req.admin.organization_id);
+        }
+
+        const result = await db.query(fetchQuery, queryParams);
+        const countResult = await db.query(countQuery, countParams);
         
         const totalGuests = parseInt(countResult.rows[0].count);
         const totalPages = Math.ceil(totalGuests / limit);
@@ -177,6 +248,10 @@ const getAllGuests = async (req, res) => {
         
         const eventId = event.id;
 
+        // [Architecture] Enforce RBAC Sandbox for Ledger Viewing
+        const hasClearance = await checkEventClearance(req.admin, eventId, context);
+        if (!hasClearance) return res.status(403).json({ success: false, message: 'Forbidden: You are not assigned to this Event Node.' });
+
         const page = Math.max(1, parseInt(req.query.page) || 1);
         let limit = parseInt(req.query.limit) || 10;
         
@@ -255,6 +330,10 @@ const updateGuestState = async (req, res) => {
         if (!event) return res.status(404).json({ success: false, message: 'Event not found.' });
         
         const eventId = event.id;
+
+        // [Architecture] Enforce RBAC Sandbox for State Mutations
+        const hasClearance = await checkEventClearance(req.admin, eventId, context);
+        if (!hasClearance) return res.status(403).json({ success: false, message: 'Forbidden: You are not authorized to execute commands in this Node.' });
 
         const { newState, errorLog } = req.body;
         if (![0, 1, 2, -1].includes(newState)) {
@@ -420,6 +499,10 @@ const getGuestById = async (req, res) => {
         
         const eventId = event.id;
 
+        // [Architecture] Enforce RBAC Sandbox for PII viewing
+        const hasClearance = await checkEventClearance(req.admin, eventId, context);
+        if (!hasClearance) return res.status(403).json({ success: false, message: 'Forbidden: You are not authorized to view PII in this Node.' });
+
         const query = `
             SELECT g.id, g.full_name, g.email, g.phone, er.id_number, er.id_document_url, er.dietary_restrictions, er.current_state, er.registered_at as created_at 
             FROM guests g
@@ -522,7 +605,6 @@ const getEventEchos = async (req, res) => {
         res.status(500).json({ success: false, message: 'Internal server error.' });
     }
 };
-
 
 const getPublicGuestDirectory = async (req, res) => {
     const context = 'GuestController - getPublicGuestDirectory';

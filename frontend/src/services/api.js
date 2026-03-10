@@ -327,6 +327,176 @@ export const logoutAdmin = async () => {
     }
 };
 
+// --- RBAC MANAGEMENT API ---
+export const fetchNetworkUsers = async () => {
+    const context = `[Frontend API Service - fetchNetworkUsers]`;
+    try {
+        // Assuming API_URL and getValidToken are already defined in your api.js
+        const token = getValidToken(context); 
+        
+        const response = await fetch(`${API_URL}/tenants/users`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Replaced handleResponse with standard inline JSON parsing
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to fetch network users.');
+        }
+
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error fetching users.`, error.message);
+        throw error;
+    }
+};
+
+// --- RBAC PROVISIONING API ---
+export const fetchOrganizations = async () => {
+    const context = `[Frontend API Service - fetchOrganizations]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/organizations`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to fetch organizations.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error fetching orgs.`, error.message);
+        throw error;
+    }
+};
+
+export const createOrganization = async (payload) => {
+    const context = `[Frontend API Service - createOrganization]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/organizations`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload) // Expects { name }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to mint organization.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error creating org.`, error.message);
+        throw error;
+    }
+};
+
+// --- RBAC DESTRUCTION API ---
+export const deleteOrganization = async (orgId) => {
+    const context = `[Frontend API Service - deleteOrganization]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/organizations/${orgId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to purge organization.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE:`, error.message);
+        throw error;
+    }
+};
+
+export const deleteNetworkUser = async (userId) => {
+    const context = `[Frontend API Service - deleteNetworkUser]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to purge identity.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE:`, error.message);
+        throw error;
+    }
+};
+
+export const removeStaffFromEvent = async (payload) => {
+    const context = `[Frontend API Service - removeStaffFromEvent]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/staff/assign`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload) 
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to sever staff link.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE:`, error.message);
+        throw error;
+    }
+};
+
+export const provisionNetworkUser = async (payload) => {
+    const context = `[Frontend API Service - provisionNetworkUser]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/users`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to provision user.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error provisioning user.`, error.message);
+        throw error;
+    }
+};
+
+// --- RBAC ASSIGNMENT API ---
+export const assignStaffToEvent = async (payload) => {
+    const context = `[Frontend API Service - assignStaffToEvent]`;
+    try {
+        const token = getValidToken(context);
+        const response = await fetch(`${API_URL}/tenants/staff/assign`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload) // Expects { admin_id, event_id }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to assign staff to the node.');
+        return data;
+    } catch (error) {
+        console.error(`${context} CRITICAL FAILURE: Network error assigning staff.`, error.message);
+        throw error;
+    }
+};
+
 export const resendAccessCode = async (eventSlug, email) => {
     const context = `[Frontend API Service - resendAccessCode - ${eventSlug}]`;
     console.log(`${context} Step 1: Initiating code recovery for ${email}`);
@@ -399,6 +569,7 @@ export const fetchPublicEvents = async () => {
     try {
         const response = await fetch(`${API_URL}/events`, {
             method: 'GET',
+            cache: 'no-store' // [Architecture] Bypasses Next.js static caching to prevent Phantom Data
         });
 
         const data = await response.json();

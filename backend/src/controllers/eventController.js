@@ -5,6 +5,15 @@ const vercelService = require('../services/vercelService');
 // [Architecture] Importing the Engine Telemetry for Vector 2
 const { getMeshTelemetry } = require('./abyssController');
 
+// --- HELPER: TENANT SANDBOX ---
+// [Architecture] Ensures queries are scoped to the Admin's Organization
+const getTenantFilter = (admin, tableAlias = 'e') => {
+    if (admin.role === 'superadmin') {
+        return ''; 
+    }
+    return ` AND ${tableAlias}.organization_id = ${admin.organization_id} `;
+};
+
 // --- READ PIPELINES ---
 
 const getPublicEvents = async (req, res) => {
@@ -38,21 +47,58 @@ const getPublicEvents = async (req, res) => {
 
 const getAllAdminEvents = async (req, res) => {
     const context = 'EventController - getAllAdminEvents';
-    logger.info(context, 'Admin fetching ALL tenants for Master Control Plane.');
+    logger.info(context, `Admin [${req.admin.email}] fetching ALL tenants for Master Control Plane. Role: ${req.admin.role}`);
 
     try {
-        const query = `
-            SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
-                   e.custom_domain, e.theme_config,
-                   (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
-                   COALESCE(
-                       (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
-                        FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
-                   ) as images
-            FROM events e
-            ORDER BY e.created_at DESC;
-        `;
-        const result = await db.query(query);
+        let query = '';
+        let values = [];
+
+        // ARCHITECTURE: Three-Tiered Ledger Resolution
+        if (req.admin.role === 'superadmin') {
+            query = `
+                SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
+                       e.custom_domain, e.theme_config,
+                       (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
+                       COALESCE(
+                           (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
+                            FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
+                       ) as images
+                FROM events e
+                ORDER BY e.created_at DESC;
+            `;
+        } else if (req.admin.role === 'tenant_admin') {
+            query = `
+                SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
+                       e.custom_domain, e.theme_config,
+                       (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
+                       COALESCE(
+                           (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
+                            FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
+                       ) as images
+                FROM events e
+                WHERE e.organization_id = $1
+                ORDER BY e.created_at DESC;
+            `;
+            values = [req.admin.organization_id];
+        } else if (req.admin.role === 'staff') {
+            // Ground Nodes ONLY see explicitly mapped assignments
+            query = `
+                SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
+                       e.custom_domain, e.theme_config,
+                       (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
+                       COALESCE(
+                           (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
+                            FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
+                       ) as images
+                FROM events e
+                JOIN event_staff_assignments esa ON e.id = esa.event_id
+                WHERE esa.admin_id = $1
+                ORDER BY e.created_at DESC;
+            `;
+            values = [req.admin.id];
+        }
+
+        const result = await db.query(query, values);
 
         res.status(200).json({
             success: true,
@@ -73,7 +119,7 @@ const getEventBySlug = async (req, res) => {
         // ARCHITECT NOTE: The query now automatically resolves the temporal itinerary engine (event_schedules)
         const query = `
             SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
-                   e.custom_domain, e.theme_config,
+                   e.custom_domain, e.theme_config, e.organization_id,
                    (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
                    COALESCE(
                        (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
@@ -101,9 +147,18 @@ const getEventBySlug = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Event not found.' });
         }
 
+        const event = result.rows[0];
+
+        // Ensure Tenant Admins don't read settings for other agency's events
+        if (req.admin && req.admin.role === 'tenant_admin') {
+            if (event.organization_id !== req.admin.organization_id) {
+                return res.status(403).json({ success: false, message: 'Forbidden: You do not own this Event Node.' });
+            }
+        }
+
         res.status(200).json({
             success: true,
-            data: result.rows[0]
+            data: event
         });
     } catch (error) {
         logger.error(context, `Failure Point EV3: CRITICAL FAILURE fetching event ${eventSlug}.`, error);
@@ -183,14 +238,15 @@ const updateEventSchedule = async (req, res) => {
     try {
         await client.query('BEGIN'); // Start atomic transaction
 
-        // 1. Resolve slug to Event ID
-        const eventQuery = `SELECT id FROM events WHERE slug = $1;`;
+        // 1. Resolve slug to Event ID + Apply Tenant Sandbox
+        const tenantFilter = getTenantFilter(req.admin, 'events');
+        const eventQuery = `SELECT id FROM events WHERE slug = $1 ${tenantFilter};`;
         const eventResult = await client.query(eventQuery, [eventSlug]);
 
         if (eventResult.rowCount === 0) {
             await client.query('ROLLBACK');
-            logger.warn(context, `Failure Point EV-SCH-2: Target tenant not found: ${eventSlug}`);
-            return res.status(404).json({ success: false, message: 'Event not found.' });
+            logger.warn(context, `Failure Point EV-SCH-2: Target tenant not found or insufficient clearance: ${eventSlug}`);
+            return res.status(404).json({ success: false, message: 'Event not found or insufficient clearance.' });
         }
 
         const eventId = eventResult.rows[0].id;
@@ -247,11 +303,12 @@ const getEventTelemetry = async (req, res) => {
     logger.info(context, `Step 1: Admin requesting live telemetry for node ${eventSlug}...`);
 
     try {
-        const eventQuery = `SELECT id FROM events WHERE slug = $1;`;
+        const tenantFilter = getTenantFilter(req.admin, 'events');
+        const eventQuery = `SELECT id FROM events WHERE slug = $1 ${tenantFilter};`;
         const eventResult = await db.query(eventQuery, [eventSlug]);
 
         if (eventResult.rowCount === 0) {
-            return res.status(404).json({ success: false, message: 'Event not found.' });
+            return res.status(404).json({ success: false, message: 'Event not found or insufficient clearance.' });
         }
 
         const eventId = eventResult.rows[0].id;
@@ -290,11 +347,12 @@ const dissolveEventMesh = async (req, res) => {
     logger.warn(context, `!!! CRITICAL COMMAND RECEIVED: Admin initiated THE DISSOLVE for Node [${eventSlug}] !!!`);
 
     try {
-        const eventQuery = `SELECT id, name FROM events WHERE slug = $1;`;
+        const tenantFilter = getTenantFilter(req.admin, 'events');
+        const eventQuery = `SELECT id, name FROM events WHERE slug = $1 ${tenantFilter};`;
         const eventResult = await db.query(eventQuery, [eventSlug]);
 
         if (eventResult.rowCount === 0) {
-            return res.status(404).json({ success: false, message: 'Event not found.' });
+            return res.status(404).json({ success: false, message: 'Event not found or insufficient clearance.' });
         }
 
         const eventId = eventResult.rows[0].id;
@@ -396,9 +454,13 @@ const createEvent = async (req, res) => {
         }
 
         logger.info(context, 'Step 3: Collision check passed. Inserting into database with MSaaS Edge configs...');
+        
+        // Resolve Org ID based on Admin Tier
+        const orgId = req.admin.role === 'superadmin' ? null : req.admin.organization_id;
+
         const insertQuery = `
-            INSERT INTO events (name, slug, description, start_date, end_date, location, is_public, custom_domain, theme_config)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            INSERT INTO events (name, slug, description, start_date, end_date, location, is_public, custom_domain, theme_config, organization_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id, name, slug, custom_domain, is_public;
         `;
         
@@ -406,7 +468,7 @@ const createEvent = async (req, res) => {
         const safeStartDate = startDate ? startDate : null;
         const safeEndDate = endDate ? endDate : null;
 
-        const values = [name, slug, description, safeStartDate, safeEndDate, location, publicFlag, safeCustomDomain, safeThemeConfig];
+        const values = [name, slug, description, safeStartDate, safeEndDate, location, publicFlag, safeCustomDomain, safeThemeConfig, orgId];
         const result = await db.query(insertQuery, values);
         const newEvent = result.rows[0];
 
@@ -451,12 +513,13 @@ const updateEvent = async (req, res) => {
         }
 
         logger.info(context, 'Step 2: Verifying target tenant exists...');
-        const checkExistQuery = `SELECT id, custom_domain FROM events WHERE slug = $1;`;
+        const tenantFilter = getTenantFilter(req.admin, 'events');
+        const checkExistQuery = `SELECT id, custom_domain FROM events WHERE slug = $1 ${tenantFilter};`;
         const existResult = await db.query(checkExistQuery, [currentSlug]);
 
         if (existResult.rowCount === 0) {
-            logger.warn(context, `Failure Point EV-Update: Target tenant not found: ${currentSlug}`);
-            return res.status(404).json({ success: false, message: 'Event not found.' });
+            logger.warn(context, `Failure Point EV-Update: Target tenant not found or insufficient clearance: ${currentSlug}`);
+            return res.status(404).json({ success: false, message: 'Event not found or insufficient clearance.' });
         }
 
         const existingEvent = existResult.rows[0];
@@ -556,26 +619,29 @@ const deleteEvent = async (req, res) => {
     logger.info(context, `Step 1: Admin initiated purge protocol for tenant: ${eventSlug}`);
 
     try {
-        const deleteQuery = `DELETE FROM events WHERE slug = $1 RETURNING id, name, custom_domain;`;
-        const result = await db.query(deleteQuery, [eventSlug]);
+        const tenantFilter = getTenantFilter(req.admin, 'events');
+        const checkQuery = `SELECT id, name, custom_domain FROM events WHERE slug = $1 ${tenantFilter};`;
+        const checkResult = await db.query(checkQuery, [eventSlug]);
 
-        if (result.rowCount === 0) {
-            logger.warn(context, `Failure Point EV12: Cannot delete, event not found: ${eventSlug}`);
-            return res.status(404).json({ success: false, message: 'Event not found.' });
+        if (checkResult.rowCount === 0) {
+            logger.warn(context, `Failure Point EV12: Cannot delete, event not found or insufficient clearance: ${eventSlug}`);
+            return res.status(404).json({ success: false, message: 'Event not found or insufficient clearance.' });
         }
 
-        const deletedEvent = result.rows[0];
+        const targetEvent = checkResult.rows[0];
+        const deleteQuery = `DELETE FROM events WHERE id = $1 RETURNING id;`;
+        await db.query(deleteQuery, [targetEvent.id]);
 
         // [Architecture] Purge the custom domain from Vercel to free it up globally
-        if (deletedEvent.custom_domain) {
+        if (targetEvent.custom_domain) {
             try {
-                await vercelService.removeCustomDomain(deletedEvent.custom_domain);
+                await vercelService.removeCustomDomain(targetEvent.custom_domain);
             } catch (vercelError) {
                 logger.warn(context, `Domain purge warning: ${vercelError.message}. Database deletion will proceed regardless.`);
             }
         }
 
-        logger.info(context, `Step 2: Tenant ${deletedEvent.name} and all cascading data successfully obliterated.`);
+        logger.info(context, `Step 2: Tenant ${targetEvent.name} and all cascading data successfully obliterated.`);
         res.status(200).json({ 
             success: true, 
             message: 'Tenant environment has been securely purged.' 

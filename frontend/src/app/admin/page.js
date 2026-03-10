@@ -4,10 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-// [Architecture] Import the explicit logout dispatcher
-import { fetchAllAdminEvents, fetchGlobalGuests, logoutAdmin } from '../../services/api';
+import { 
+    fetchAllAdminEvents, fetchGlobalGuests, fetchNetworkUsers, logoutAdmin, 
+    fetchOrganizations, provisionNetworkUser, assignStaffToEvent, createOrganization,
+    deleteNetworkUser, removeStaffFromEvent, deleteOrganization 
+} from '../../services/api';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
+import { LumaDropdown } from '@/components/ui/luma-dropdown';
 
 export default function MasterDashboard() {
     const context = '[Master Control Plane]';
@@ -16,15 +20,39 @@ export default function MasterDashboard() {
     const [activeTab, setActiveTab] = useState('active_events'); 
     const [events, setEvents] = useState([]);
     const [globalGuests, setGlobalGuests] = useState([]);
+    const [networkUsers, setNetworkUsers] = useState([]); 
     const [status, setStatus] = useState('loading'); 
     const [selectedGlobalGuest, setSelectedGlobalGuest] = useState(null);
+    const [adminRole, setAdminRole] = useState(null); 
+
+    // --- PROVISIONING STATE ---
+    const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
+    const [organizations, setOrganizations] = useState([]);
+    const [provisionForm, setProvisionForm] = useState({ email: '', password: '', role: 'staff', organization_id: '' });
+    const [provisionStatus, setProvisionStatus] = useState('idle');
+    const [provisionMessage, setProvisionMessage] = useState('');
+
+    // --- ASSIGNMENT STATE ---
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [selectedStaff, setSelectedStaff] = useState(null);
+    const [assignmentEventId, setAssignmentEventId] = useState('');
+    const [assignStatus, setAssignStatus] = useState('idle');
+    const [assignMessage, setAssignMessage] = useState('');
+
+    // --- ORGANIZATION STATE ---
+    const [isOrgModalOpen, setIsOrgModalOpen] = useState(false);
+    const [orgForm, setOrgForm] = useState({ name: '' });
+    const [orgStatus, setOrgStatus] = useState('idle');
+    const [orgMessage, setOrgMessage] = useState('');
+
+    // --- DESTRUCTIVE ACTION STATE ---
+    const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', action: null, isLoading: false });
 
     const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 
     useEffect(() => {
         let inactivityTimer;
 
-        // [Architecture] Upgraded Gatekeeper to hunt for the cryptographic JWT
         const validateGatekeeper = () => {
             const token = localStorage.getItem('adminToken');
             if (!token) {
@@ -32,18 +60,29 @@ export default function MasterDashboard() {
                 router.push('/admin/login');
                 return false;
             }
+            
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                const decoded = JSON.parse(jsonPayload);
+                setAdminRole(decoded.role);
+            } catch (e) {
+                console.warn(`${context} Malformed token detected.`);
+            }
+
             return true;
         };
 
         const handleLogout = async () => {
-            console.log(`${context} Action: Session purged due to inactivity.`);
             try {
-                // Dissolve the Valkey lock first
                 await logoutAdmin();
             } catch (err) {
-                console.warn(`${context} Network fail during inactivity logout, purging local token regardless.`);
+                console.warn(`${context} Network fail during inactivity logout.`);
             } finally {
-                localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
+                localStorage.removeItem('adminToken'); 
                 router.push('/admin/login');
             }
         };
@@ -58,8 +97,12 @@ export default function MasterDashboard() {
         if (validateGatekeeper()) {
             if (activeTab === 'active_events' || activeTab === 'previous_events') {
                 loadTenants();
-            } else {
+            } else if (activeTab === 'guests') {
                 loadGlobalGuests();
+            } else if (activeTab === 'network_security') {
+                loadNetworkUsers();
+            } else if (activeTab === 'agencies') {
+                loadOrgsDashboard();
             }
 
             resetInactivityTimer();
@@ -73,6 +116,40 @@ export default function MasterDashboard() {
         }
     }, [router, activeTab]);
 
+    const loadOrgs = async () => {
+        if (adminRole !== 'superadmin') return;
+        try {
+            const res = await fetchOrganizations();
+            setOrganizations(res.data);
+        } catch (error) {
+            console.error("Failed to load organizations");
+        }
+    };
+
+    const loadOrgsDashboard = async () => {
+        if (adminRole !== 'superadmin') return;
+        setStatus('loading');
+        try {
+            const res = await fetchOrganizations();
+            setOrganizations(res.data);
+            setStatus('success');
+        } catch (error) {
+            setStatus('error');
+        }
+    };
+
+    useEffect(() => {
+        if (isProvisionModalOpen && adminRole === 'superadmin') {
+            loadOrgs();
+        }
+    }, [isProvisionModalOpen, adminRole]);
+
+    useEffect(() => {
+        if (isAssignModalOpen && events.length === 0) {
+            loadTenants();
+        }
+    }, [isAssignModalOpen, events.length]);
+
     const loadTenants = async () => {
         setStatus('loading');
         try {
@@ -80,10 +157,7 @@ export default function MasterDashboard() {
             setEvents(data);
             setStatus('success');
         } catch (error) {
-            console.error(`${context} Failure fetching tenants:`, error);
-            // ARCHITECT NOTE: Check for explicit security messages instead of just status codes
-            const msg = error.message.toLowerCase();
-            if (msg.includes('401') || msg.includes('403') || msg.includes('session') || msg.includes('unauthorized')) {
+            if (error.message.toLowerCase().includes('401') || error.message.toLowerCase().includes('session')) {
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             } else {
@@ -99,27 +173,153 @@ export default function MasterDashboard() {
             setGlobalGuests(result.data);
             setStatus('success');
         } catch (error) {
-            console.error(`${context} Failure fetching global guests:`, error);
-            const msg = error.message.toLowerCase();
-            if (msg.includes('401') || msg.includes('403') || msg.includes('session') || msg.includes('unauthorized')) {
-                localStorage.removeItem('adminToken');
-                router.push('/admin/login');
-            } else {
-                setStatus('error');
-            }
+            setStatus('error');
+        }
+    };
+
+    const loadNetworkUsers = async () => {
+        setStatus('loading');
+        try {
+            const result = await fetchNetworkUsers(); 
+            setNetworkUsers(result.data);
+            setStatus('success');
+        } catch (error) {
+            setStatus('error');
         }
     };
 
     const handleLockVault = async () => {
         try {
-            // [Architecture] Dissolve the Valkey lock to free up the concurrent session limit
             await logoutAdmin();
-        } catch (err) {
-             console.warn(`${context} Network fail during explicit logout, purging local token regardless.`);
-        } finally {
-            localStorage.removeItem('adminToken'); // [Architecture] Purge the JWT
+        } catch (err) {} finally {
+            localStorage.removeItem('adminToken'); 
             router.push('/admin/login');
         }
+    };
+
+    const handleOrgSubmit = async (e) => {
+        e.preventDefault();
+        setOrgStatus('loading');
+        setOrgMessage('');
+        try {
+            await createOrganization({ name: orgForm.name });
+            setOrgStatus('idle');
+            setOrgForm({ name: '' });
+            setIsOrgModalOpen(false);
+            if (activeTab === 'agencies') {
+                loadOrgsDashboard();
+            } else {
+                loadOrgs(); 
+            }
+        } catch (error) {
+            setOrgStatus('error');
+            setOrgMessage(error.message);
+        }
+    };
+
+    const handleProvisionSubmit = async (e) => {
+        e.preventDefault();
+        setProvisionStatus('loading');
+        setProvisionMessage('');
+        try {
+            const payload = {
+                email: provisionForm.email,
+                password: provisionForm.password,
+                role: provisionForm.role,
+                organization_id: provisionForm.organization_id ? parseInt(provisionForm.organization_id) : null
+            };
+            await provisionNetworkUser(payload);
+            setProvisionStatus('idle');
+            setProvisionForm({ email: '', password: '', role: 'staff', organization_id: '' });
+            setIsProvisionModalOpen(false);
+            if (activeTab === 'network_security') loadNetworkUsers(); 
+        } catch (error) {
+            setProvisionStatus('error');
+            setProvisionMessage(error.message);
+        }
+    };
+
+    const handleAssignSubmit = async (e) => {
+        e.preventDefault();
+        if (!assignmentEventId) return;
+        setAssignStatus('loading');
+        setAssignMessage('');
+        try {
+            await assignStaffToEvent({ 
+                admin_id: selectedStaff.id, 
+                event_id: parseInt(assignmentEventId) 
+            });
+            setAssignStatus('idle');
+            setAssignmentEventId('');
+            setIsAssignModalOpen(false);
+            loadNetworkUsers(); 
+        } catch (error) {
+            setAssignStatus('error');
+            setAssignMessage(error.message);
+        }
+    };
+
+    // --- DESTRUCTIVE ACTION PIPELINES ---
+    const triggerDeleteUser = (userId, userEmail) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Purge Identity',
+            message: `You are about to permanently purge the identity [${userEmail}]. This action cannot be reversed.`,
+            action: async () => {
+                await deleteNetworkUser(userId);
+                loadNetworkUsers();
+            }
+        });
+    };
+
+    const triggerSeverAssignment = (adminId, eventId, eventTitle) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Sever Node Binding',
+            message: `Are you sure you want to sever the connection to Event Sandbox [${eventTitle}]?`,
+            action: async () => {
+                await removeStaffFromEvent({ admin_id: adminId, event_id: eventId });
+                loadNetworkUsers(); 
+            }
+        });
+    };
+
+    const triggerDeleteOrg = (orgId, orgName) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Purge Agency',
+            message: `You are about to purge the agency [${orgName}]. CRITICAL: The database will violently reject this if there are still active organizers, staff, or events tied to this sandbox. Proceed?`,
+            action: async () => {
+                await deleteOrganization(orgId);
+                loadOrgsDashboard();
+            }
+        });
+    };
+
+    const executeConfirmAction = async () => {
+        setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+        try {
+            if (confirmDialog.action) {
+                await confirmDialog.action();
+            }
+            setConfirmDialog({ isOpen: false, title: '', message: '', action: null, isLoading: false });
+        } catch (error) {
+            alert(`Execution Failed: ${error.message}`);
+            setConfirmDialog(prev => ({ ...prev, isLoading: false }));
+        }
+    };
+
+    const closeConfirmDialog = () => {
+        if (!confirmDialog.isLoading) {
+            setConfirmDialog({ isOpen: false, title: '', message: '', action: null, isLoading: false });
+        }
+    };
+
+    const openAssignModal = (user) => {
+        setSelectedStaff(user);
+        setAssignmentEventId('');
+        setAssignMessage('');
+        setIsAssignModalOpen(true);
     };
 
     const renderStateBadge = (state) => {
@@ -132,17 +332,20 @@ export default function MasterDashboard() {
         }
     };
 
+    const renderRoleBadge = (role) => {
+        switch(role) {
+            case 'superadmin': return <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-fuchsia-400 bg-fuchsia-500/10 px-2 py-1 rounded border border-fuchsia-500/20">Master Tier</span>;
+            case 'tenant_admin': return <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-400 bg-cyan-500/10 px-2 py-1 rounded border border-cyan-500/20">Organizer</span>;
+            case 'staff': return <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20">Ground Node</span>;
+            default: return <span className="text-[9px] uppercase font-bold text-zinc-500">Unknown</span>;
+        }
+    };
+
     const activeEvents = events.filter(e => !e.is_expired);
     const previousEvents = events.filter(e => e.is_expired);
 
-    const staggerContainer = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
-    const itemVariant = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-    };
+    const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+    const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
     const renderEventCards = (eventList) => {
         if (eventList.length === 0) {
@@ -156,9 +359,7 @@ export default function MasterDashboard() {
         return eventList.map((event) => (
             <motion.div key={event.slug} variants={itemVariant}>
                 <div className={`relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] group ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
-                    
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
-
                     <div className="relative z-10 flex justify-between items-start mb-8">
                         <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08] text-sm font-light text-zinc-300 shadow-inner">
                             {event.slug.charAt(0).toUpperCase()}
@@ -171,12 +372,7 @@ export default function MasterDashboard() {
                     
                     <div className="relative z-10">
                         <h3 className="text-xl font-medium text-white mb-2 tracking-tight truncate">{event.title}</h3>
-                        <a 
-                            href={`/${event.slug}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-cyan-400 transition-colors flex items-center gap-2 w-fit group/link"
-                        >
+                        <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-cyan-400 transition-colors flex items-center gap-2 w-fit group/link">
                             /{event.slug}
                             <svg className="w-3 h-3 opacity-0 -translate-x-2 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         </a>
@@ -186,8 +382,7 @@ export default function MasterDashboard() {
                         <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white text-zinc-300 hover:text-black py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all shadow-inner hover:shadow-none">
                             {event.is_expired ? 'View Ledger' : 'Manage Node'}
                         </Link>
-                        {/* ARCHITECTURE: Immutable Archive Lock - Hide Edit button for historical nodes */}
-                        {!event.is_expired && (
+                        {!event.is_expired && adminRole !== 'staff' && (
                             <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                             </Link>
@@ -198,79 +393,82 @@ export default function MasterDashboard() {
         ));
     };
 
+    const roleOptions = [
+        { label: 'Level 2: Event Staff (Ground Node)', value: 'staff' },
+        ...(adminRole === 'superadmin' ? [{ label: 'Level 1: Tenant Admin (Organizer)', value: 'tenant_admin' }] : [])
+    ];
+
+    const orgOptions = [
+        { label: 'Global / Unassigned', value: '' },
+        ...organizations.map(org => ({ label: org.name, value: String(org.id) }))
+    ];
+
+    const activeEventOptions = [
+        { label: '-- Select Event Sandbox --', value: '' },
+        ...activeEvents.map(ev => ({ label: ev.title, value: String(ev.id) }))
+    ];
+
     return (
         <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
-            
             <AmbientAurora />
             <InteractiveAura />
 
             <header className="w-full max-w-7xl flex items-center justify-between px-6 py-8 z-20 border-b border-white/[0.02]">
                 <div className="flex items-center gap-5">
-                    <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs tracking-tighter shadow-[0_0_20px_rgba(255,255,255,0.2)]">
-                        NX
-                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs tracking-tighter shadow-[0_0_20px_rgba(255,255,255,0.2)]">NX</div>
                     <div>
                         <h1 className="text-3xl font-light text-white tracking-tight mb-1">Control Plane</h1>
                         <p className="text-[9px] text-zinc-500 font-bold tracking-[0.3em] uppercase">Master Ledger Management</p>
                     </div>
                 </div>
-
                 <div className="flex items-center gap-4">
-                    <Link 
-                        href="/admin/events/new"
-                        className="hidden sm:flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-black bg-white hover:bg-zinc-200 px-6 py-3 rounded-full transition-all shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-95"
-                    >
-                        Deploy Tenant
-                    </Link>
-                    <button 
-                        onClick={handleLockVault}
-                        className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] px-6 py-3 rounded-full backdrop-blur-md"
-                    >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
+                    {adminRole !== 'staff' && (
+                        <Link href="/admin/events/new" className="hidden sm:flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-black bg-white hover:bg-zinc-200 px-6 py-3 rounded-full transition-all shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-95">
+                            Deploy Tenant
+                        </Link>
+                    )}
+                    <button onClick={handleLockVault} className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] hover:bg-white/[0.05] px-6 py-3 rounded-full backdrop-blur-md">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
                         Lock Vault
                     </button>
                 </div>
             </header>
 
             <div className="max-w-7xl w-full z-10 flex flex-col px-6 pb-16 pt-8">
-                
-                <div className="flex space-x-10 mb-12 border-b border-white/[0.05]">
-                    <button 
-                        onClick={() => setActiveTab('active_events')} 
-                        className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'active_events' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
-                    >
+                <div className="flex space-x-10 mb-12 border-b border-white/[0.05] overflow-x-auto custom-scrollbar whitespace-nowrap">
+                    <button onClick={() => setActiveTab('active_events')} className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'active_events' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}>
                         Active Tenants
                         {activeTab === 'active_events' && <motion.span layoutId="activeTabIndicator" className="absolute bottom-0 left-0 w-full h-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></motion.span>}
                     </button>
-                    <button 
-                        onClick={() => setActiveTab('previous_events')} 
-                        className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'previous_events' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
-                    >
+                    <button onClick={() => setActiveTab('previous_events')} className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'previous_events' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}>
                         Historical Nodes
                         {activeTab === 'previous_events' && <motion.span layoutId="activeTabIndicator" className="absolute bottom-0 left-0 w-full h-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></motion.span>}
                     </button>
-                    <button 
-                        onClick={() => setActiveTab('guests')} 
-                        className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'guests' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}
-                    >
-                        Global Directory
-                        {activeTab === 'guests' && <motion.span layoutId="activeTabIndicator" className="absolute bottom-0 left-0 w-full h-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></motion.span>}
-                    </button>
+                    {adminRole === 'superadmin' && (
+                        <button onClick={() => setActiveTab('agencies')} className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'agencies' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}>
+                            Agencies & Tenants
+                            {activeTab === 'agencies' && <motion.span layoutId="activeTabIndicator" className="absolute bottom-0 left-0 w-full h-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></motion.span>}
+                        </button>
+                    )}
+                    {/* [Architecture] Unlocked for Tenant Admins */}
+                    {(adminRole === 'superadmin' || adminRole === 'tenant_admin') && (
+                        <button onClick={() => setActiveTab('guests')} className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'guests' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}>
+                            {adminRole === 'superadmin' ? 'Global Directory' : 'Guest Directory'}
+                            {activeTab === 'guests' && <motion.span layoutId="activeTabIndicator" className="absolute bottom-0 left-0 w-full h-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></motion.span>}
+                        </button>
+                    )}
+                    {(adminRole === 'superadmin' || adminRole === 'tenant_admin') && (
+                        <button onClick={() => setActiveTab('network_security')} className={`pb-4 text-[10px] font-bold uppercase tracking-[0.2em] transition-all relative ${activeTab === 'network_security' ? 'text-white' : 'text-zinc-600 hover:text-zinc-300'}`}>
+                            Network Security
+                            {activeTab === 'network_security' && <motion.span layoutId="activeTabIndicator" className="absolute bottom-0 left-0 w-full h-[2px] bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]"></motion.span>}
+                        </button>
+                    )}
                 </div>
 
                 <AnimatePresence mode="wait">
                     {status === 'loading' ? (
-                        <motion.div 
-                            key="loading"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="flex flex-col items-center justify-center py-32"
-                        >
-                            <svg className="animate-spin h-6 w-6 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                        <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-32">
+                            <svg className="animate-spin h-6 w-6 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         </motion.div>
                     ) : activeTab === 'active_events' ? (
                         <motion.div key="active_events" variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -280,19 +478,132 @@ export default function MasterDashboard() {
                         <motion.div key="previous_events" variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                             {renderEventCards(previousEvents)}
                         </motion.div>
-                    ) : (
-                        <motion.div 
-                            key="guests"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                            className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl"
-                        >
+                    ) : activeTab === 'agencies' && adminRole === 'superadmin' ? (
+                        <motion.div key="agencies" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">
+                            <div className="p-8 border-b border-white/[0.03] flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-lg font-medium text-white tracking-tight">Agency Ledger</h2>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Manage Tenant Sandboxes</p>
+                                </div>
+                                <button onClick={() => setIsOrgModalOpen(true)} className="px-5 py-2.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 hover:text-cyan-300 text-[10px] font-bold uppercase tracking-widest transition-all">
+                                    + Mint Agency
+                                </button>
+                            </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
                                     <thead>
                                         <tr className="border-b border-white/[0.02] bg-white/[0.01]">
-                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Global Identity</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Agency ID</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Agency Name</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Deployment Date</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em] text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.02]">
+                                        {organizations.length === 0 ? (
+                                            <tr><td colSpan="4" className="py-20 text-center text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase border-dashed border-t border-white/[0.05]">No Agencies Deployed.</td></tr>
+                                        ) : organizations.map((org) => (
+                                            <tr key={org.id} className="group hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-8 py-6"><div className="text-[10px] text-zinc-400 font-mono">{org.id}</div></td>
+                                                <td className="px-8 py-6"><div className="text-sm font-medium text-zinc-200 tracking-tight">{org.name}</div></td>
+                                                <td className="px-8 py-6 text-[10px] font-mono text-zinc-500">{new Date(org.created_at).toLocaleDateString()}</td>
+                                                <td className="px-8 py-6 text-right">
+                                                    <button 
+                                                        onClick={() => triggerDeleteOrg(org.id, org.name)}
+                                                        className="px-4 py-2 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 hover:text-rose-300 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                                    >
+                                                        Purge Agency
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
+                    ) : activeTab === 'network_security' ? (
+                        <motion.div key="network_security" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">
+                            <div className="p-8 border-b border-white/[0.03] flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-lg font-medium text-white tracking-tight">Access Control & Identities</h2>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Manage Tiered Authorization Nodes</p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setIsProvisionModalOpen(true)} className="px-5 py-2.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-300 hover:text-white hover:bg-white/[0.08] text-[10px] font-bold uppercase tracking-widest transition-all">
+                                        + Provision Account
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-white/[0.02] bg-white/[0.01]">
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Identity UUID</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Network Email</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Security Tier</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Organization / Assignments</th>
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em] text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.02]">
+                                        {networkUsers.length === 0 ? (
+                                            <tr><td colSpan="5" className="py-20 text-center text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase border-dashed border-t border-white/[0.05]">No Active Identities Found.</td></tr>
+                                        ) : networkUsers.map((user) => (
+                                            <tr key={user.id} className="group hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-8 py-6"><div className="text-[10px] text-zinc-400 font-mono">{user.id}</div></td>
+                                                <td className="px-8 py-6"><div className="text-sm font-medium text-zinc-200 tracking-tight">{user.email}</div></td>
+                                                <td className="px-8 py-6">{renderRoleBadge(user.role)}</td>
+                                                <td className="px-8 py-6">
+                                                    <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">
+                                                        {user.organization_name || 'Global Sandbox'}
+                                                    </div>
+                                                    {user.role === 'staff' && user.assignments && user.assignments.length > 0 && (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {user.assignments.map(assign => (
+                                                                <button 
+                                                                    key={assign.id}
+                                                                    onClick={() => triggerSeverAssignment(user.id, assign.id, assign.title)}
+                                                                    className="group/badge flex items-center gap-1.5 text-[9px] font-mono text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded border border-cyan-500/20 hover:border-rose-500/50 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
+                                                                    title="Click to Sever Binding"
+                                                                >
+                                                                    {assign.title}
+                                                                    <svg className="w-3 h-3 opacity-0 group-hover/badge:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-8 py-6 text-right flex justify-end gap-3">
+                                                    {user.role === 'staff' && (
+                                                        <button 
+                                                            onClick={() => openAssignModal(user)}
+                                                            className="px-4 py-2 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500/20 hover:text-cyan-300 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                                        >
+                                                            Link Node
+                                                        </button>
+                                                    )}
+                                                    {user.role !== 'superadmin' && (
+                                                        <button 
+                                                            onClick={() => triggerDeleteUser(user.id, user.email)}
+                                                            className="px-4 py-2 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20 hover:text-rose-300 text-[9px] font-bold uppercase tracking-widest transition-all"
+                                                        >
+                                                            Purge
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.div key="guests" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="border-b border-white/[0.02] bg-white/[0.01]">
+                                            <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">{adminRole === 'superadmin' ? 'Global Identity' : 'Guest Identity'}</th>
                                             <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Communication</th>
                                             <th className="px-8 py-6 text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Entry Date</th>
                                             <th className="px-8 py-6 text-right text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Action</th>
@@ -300,9 +611,7 @@ export default function MasterDashboard() {
                                     </thead>
                                     <tbody className="divide-y divide-white/[0.02]">
                                         {globalGuests.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="4" className="py-20 text-center text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase border-dashed border-t border-white/[0.05]">No guests located in ledger.</td>
-                                            </tr>
+                                            <tr><td colSpan="4" className="py-20 text-center text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase border-dashed border-t border-white/[0.05]">No guests located in ledger.</td></tr>
                                         ) : globalGuests.map((guest) => (
                                             <tr key={guest.id} className="group hover:bg-white/[0.02] transition-colors">
                                                 <td className="px-8 py-6">
@@ -313,16 +622,9 @@ export default function MasterDashboard() {
                                                     <div className="text-xs text-zinc-400">{guest.email}</div>
                                                     <div className="text-[10px] text-zinc-600 mt-1.5">{guest.phone || 'No phone'}</div>
                                                 </td>
-                                                <td className="px-8 py-6 text-[10px] font-mono text-zinc-500">
-                                                    {new Date(guest.created_at).toLocaleDateString()}
-                                                </td>
+                                                <td className="px-8 py-6 text-[10px] font-mono text-zinc-500">{new Date(guest.created_at).toLocaleDateString()}</td>
                                                 <td className="px-8 py-6 text-right">
-                                                    <button 
-                                                        onClick={() => setSelectedGlobalGuest(guest)}
-                                                        className="text-[9px] font-bold tracking-[0.2em] uppercase px-5 py-2.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-400 hover:text-white hover:bg-white hover:text-black transition-all"
-                                                    >
-                                                        View Vault
-                                                    </button>
+                                                    <button onClick={() => setSelectedGlobalGuest(guest)} className="text-[9px] font-bold tracking-[0.2em] uppercase px-5 py-2.5 rounded-full bg-white/[0.03] border border-white/[0.05] text-zinc-400 hover:text-white hover:bg-white hover:text-black transition-all">View Vault</button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -334,50 +636,193 @@ export default function MasterDashboard() {
                 </AnimatePresence>
             </div>
 
+            {/* --- CREATE ORGANIZATION MODAL --- */}
+            <AnimatePresence>
+                {isOrgModalOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#09090b]/60 backdrop-blur-md">
+                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-[#09090b] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-md overflow-hidden relative p-10">
+                            
+                            <div className="flex justify-between items-center mb-8 relative z-[60]">
+                                <div>
+                                    <h2 className="text-2xl font-medium text-white tracking-tight">Mint Agency</h2>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Deploy New Tenant Sandbox</p>
+                                </div>
+                                <button onClick={() => setIsOrgModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            {orgStatus === 'error' && (
+                                <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl relative z-[60]">
+                                    {orgMessage}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleOrgSubmit} className="space-y-6">
+                                <div className="space-y-2 relative z-30">
+                                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-2">Agency Name</label>
+                                    <input 
+                                        type="text" required
+                                        value={orgForm.name} onChange={(e) => setOrgForm({ name: e.target.value })}
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:border-cyan-500/50 text-sm shadow-inner placeholder:text-zinc-600"
+                                        placeholder="e.g., Horizon Events"
+                                    />
+                                </div>
+
+                                <div className="pt-4 relative z-10">
+                                    <button 
+                                        type="submit" disabled={orgStatus === 'loading'}
+                                        className="w-full py-4 bg-white text-black font-bold text-[10px] uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all disabled:opacity-50"
+                                    >
+                                        {orgStatus === 'loading' ? 'Deploying Ledger...' : 'Initialize Organization'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* --- ASSIGNMENT MODAL --- */}
+            <AnimatePresence>
+                {isAssignModalOpen && selectedStaff && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#09090b]/60 backdrop-blur-md">
+                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-[#09090b] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-md overflow-visible relative p-10">
+                            <div className="flex justify-between items-center mb-8 relative z-[60]">
+                                <div>
+                                    <h2 className="text-2xl font-medium text-white tracking-tight">Link Ground Node</h2>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Assign {selectedStaff.email}</p>
+                                </div>
+                                <button onClick={() => setIsAssignModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            {assignStatus === 'error' && (
+                                <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl relative z-[60]">
+                                    {assignMessage}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleAssignSubmit} className="space-y-6">
+                                <div className="space-y-2 relative z-50">
+                                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-2">Target Event Sandbox</label>
+                                    <LumaDropdown 
+                                        value={assignmentEventId} 
+                                        onChange={(val) => setAssignmentEventId(val)}
+                                        options={activeEventOptions}
+                                        direction="down"
+                                    />
+                                </div>
+
+                                <div className="pt-4 relative z-10">
+                                    <button 
+                                        type="submit" disabled={assignStatus === 'loading' || !assignmentEventId}
+                                        className="w-full py-4 bg-cyan-500 text-black font-bold text-[10px] uppercase tracking-widest rounded-full hover:bg-cyan-400 transition-all disabled:opacity-50 disabled:bg-zinc-800 disabled:text-zinc-500"
+                                    >
+                                        {assignStatus === 'loading' ? 'Committing Link...' : 'Execute Binding Protocol'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* --- PROVISIONING MODAL --- */}
+            <AnimatePresence>
+                {isProvisionModalOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#09090b]/60 backdrop-blur-md">
+                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-[#09090b] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-md overflow-visible relative p-10">
+                            <div className="flex justify-between items-center mb-8 relative z-[60]">
+                                <h2 className="text-2xl font-medium text-white tracking-tight">Provision Identity</h2>
+                                <button onClick={() => setIsProvisionModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                            </div>
+
+                            {provisionStatus === 'error' && (
+                                <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl relative z-[60]">
+                                    {provisionMessage}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleProvisionSubmit} className="space-y-6">
+                                <div className="space-y-2 relative z-30">
+                                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-2">Email Address</label>
+                                    <input 
+                                        type="email" required
+                                        value={provisionForm.email} onChange={(e) => setProvisionForm({...provisionForm, email: e.target.value})}
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:border-cyan-500/50 text-sm shadow-inner"
+                                    />
+                                </div>
+
+                                <div className="space-y-2 relative z-20">
+                                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-2">Temporary Password</label>
+                                    <input 
+                                        type="password" required minLength={8}
+                                        value={provisionForm.password} onChange={(e) => setProvisionForm({...provisionForm, password: e.target.value})}
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:border-cyan-500/50 text-sm shadow-inner"
+                                    />
+                                </div>
+
+                                <div className="space-y-2 relative z-50">
+                                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-2">Clearance Tier</label>
+                                    <LumaDropdown 
+                                        value={provisionForm.role} 
+                                        onChange={(val) => setProvisionForm({...provisionForm, role: val})}
+                                        options={roleOptions}
+                                        direction="down"
+                                    />
+                                </div>
+
+                                {adminRole === 'superadmin' && provisionForm.role !== 'superadmin' && (
+                                    <div className="space-y-2 relative z-40">
+                                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-2">Organization Binding</label>
+                                        <LumaDropdown 
+                                            value={provisionForm.organization_id} 
+                                            onChange={(val) => setProvisionForm({...provisionForm, organization_id: val})}
+                                            options={orgOptions}
+                                            direction="down"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="pt-4 relative z-10">
+                                    <button 
+                                        type="submit" disabled={provisionStatus === 'loading'}
+                                        className="w-full py-4 bg-white text-black font-bold text-[10px] uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-all disabled:opacity-50"
+                                    >
+                                        {provisionStatus === 'loading' ? 'Minting Identity...' : 'Initialize Record'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* --- GLOBAL GUEST VAULT MODAL --- */}
             <AnimatePresence>
                 {selectedGlobalGuest && (
-                    <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-[#09090b]/40 backdrop-blur-3xl"
-                    >
-                        <motion.div 
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className="bg-white/[0.02] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-2xl overflow-hidden relative"
-                        >
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-[#09090b]/40 backdrop-blur-3xl">
+                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} transition={{ type: "spring", stiffness: 300, damping: 30 }} className="bg-white/[0.02] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-2xl overflow-hidden relative">
                             <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
-                            
                             <div className="p-10 relative z-10">
                                 <div className="flex justify-between items-start mb-10">
                                     <div className="flex items-center gap-6">
-                                        <div className="w-16 h-16 bg-white/[0.05] rounded-full flex items-center justify-center border border-white/[0.1] text-white font-medium text-2xl shadow-inner">
-                                            {selectedGlobalGuest.full_name.charAt(0)}
-                                        </div>
+                                        <div className="w-16 h-16 bg-white/[0.05] rounded-full flex items-center justify-center border border-white/[0.1] text-white font-medium text-2xl shadow-inner">{selectedGlobalGuest.full_name.charAt(0)}</div>
                                         <div>
                                             <h2 className="text-2xl font-medium text-white tracking-tight">{selectedGlobalGuest.full_name}</h2>
                                             <p className="text-xs text-zinc-500 font-mono mt-1">UUID: <span className="text-zinc-400">{selectedGlobalGuest.id}</span></p>
                                         </div>
                                     </div>
-                                    <button onClick={() => setSelectedGlobalGuest(null)} className="w-10 h-10 flex items-center justify-center bg-white/[0.03] rounded-full text-zinc-500 hover:text-white transition-colors border border-white/[0.05] hover:bg-rose-500/20 hover:border-rose-500/30 hover:text-rose-400">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                    </button>
+                                    <button onClick={() => setSelectedGlobalGuest(null)} className="w-10 h-10 flex items-center justify-center bg-white/[0.03] rounded-full text-zinc-500 hover:text-white transition-colors border border-white/[0.05] hover:bg-rose-500/20 hover:border-rose-500/30 hover:text-rose-400"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-8 mb-10 p-6 bg-white/[0.02] rounded-[32px] border border-white/[0.05] shadow-inner">
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Network Email</span>
-                                        <p className="text-xs text-zinc-200">{selectedGlobalGuest.email}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Contact Phone</span>
-                                        <p className="text-xs text-zinc-200">{selectedGlobalGuest.phone || 'Not Provided'}</p>
-                                    </div>
+                                    <div className="space-y-1"><span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Network Email</span><p className="text-xs text-zinc-200">{selectedGlobalGuest.email}</p></div>
+                                    <div className="space-y-1"><span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Contact Phone</span><p className="text-xs text-zinc-200">{selectedGlobalGuest.phone || 'Not Provided'}</p></div>
                                 </div>
-
                                 <div className="space-y-4">
                                     <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Active Node Registrations</h3>
                                     <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
@@ -389,9 +834,7 @@ export default function MasterDashboard() {
                                                 </div>
                                                 <div className="flex items-center gap-4">
                                                     {renderStateBadge(ticket.state)}
-                                                    <Link href={`/admin/${ticket.slug}`} className="text-zinc-600 hover:text-cyan-400 transition-colors group-hover:translate-x-1 duration-300">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                                                    </Link>
+                                                    <Link href={`/admin/${ticket.slug}`} className="text-zinc-600 hover:text-cyan-400 transition-colors group-hover:translate-x-1 duration-300"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></Link>
                                                 </div>
                                             </div>
                                         ))}
@@ -399,14 +842,54 @@ export default function MasterDashboard() {
                                 </div>
                             </div>
                             <div className="px-10 py-6 bg-white/[0.01] border-t border-white/[0.05] flex justify-end relative z-10">
-                                <button onClick={() => setSelectedGlobalGuest(null)} className="text-[10px] font-bold tracking-widest uppercase px-6 py-3 rounded-full bg-white text-black transition-all hover:bg-zinc-200 shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-95">
-                                    Close Vault
+                                <button onClick={() => setSelectedGlobalGuest(null)} className="text-[10px] font-bold tracking-widest uppercase px-6 py-3 rounded-full bg-white text-black transition-all hover:bg-zinc-200 shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:scale-[1.02] active:scale-95">Close Vault</button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* --- DESTRUCTIVE ACTION CONFIRMATION MODAL --- */}
+            <AnimatePresence>
+                {confirmDialog.isOpen && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-[#09090b]/80 backdrop-blur-xl">
+                        <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }} className="bg-[#09090b] border border-rose-500/20 rounded-[40px] shadow-[0_0_50px_rgba(225,29,72,0.15)] w-full max-w-md overflow-hidden relative p-10">
+                            
+                            <div className="flex items-start gap-5 mb-8">
+                                <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shrink-0">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-medium text-rose-500 tracking-tight">{confirmDialog.title}</h2>
+                                    <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{confirmDialog.message}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 pt-4">
+                                <button 
+                                    onClick={closeConfirmDialog}
+                                    disabled={confirmDialog.isLoading}
+                                    className="flex-1 py-4 bg-white/[0.03] border border-white/[0.05] text-zinc-300 font-bold text-[10px] uppercase tracking-widest rounded-full hover:bg-white/[0.08] transition-all disabled:opacity-50"
+                                >
+                                    Cancel Request
+                                </button>
+                                <button 
+                                    onClick={executeConfirmAction}
+                                    disabled={confirmDialog.isLoading}
+                                    className="flex-1 py-4 bg-rose-500 text-white font-bold text-[10px] uppercase tracking-widest rounded-full hover:bg-rose-600 shadow-[0_0_20px_rgba(225,29,72,0.3)] transition-all disabled:opacity-50 flex justify-center items-center"
+                                >
+                                    {confirmDialog.isLoading ? (
+                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                    ) : (
+                                        'Execute Action'
+                                    )}
                                 </button>
                             </div>
                         </motion.div>
                     </motion.div>
                 )}
             </AnimatePresence>
+
         </main>
     );
 }
