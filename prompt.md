@@ -4,17 +4,17 @@
 The core goal of this repository is to provide a high-end, multi-tenant MICE (Meetings, Incentives, Conferences, and Exhibitions) platform. It operates as a Multi-Software as a Service (MSaaS) and is engineered to deliver unparalleled performance and visual fidelity for premium events.
 
 ## What is done & Capabilities
-- **Multi-Tenant Architecture:** Capable of hosting isolated events (Tenants/Nodes) within a broader MSaaS ecosystem.
+- **Multi-Tenant Architecture:** Capable of hosting isolated events (Tenants/Nodes) within a broader MSaaS ecosystem. Includes a comprehensive RBAC (Role-Based Access Control) system supporting Superadmins, Tenant Admins, and Event Staff with isolated Organization nodes.
 - **Global Ledger:** Fully operational PostgreSQL database hosted on Aiven, enforcing strict UTC timezones for all timestamps.
-- **Admin Control Plane:** Live management dashboard used for system-wide configuration, node deployment, and event management.
+- **Admin Control Plane:** Live management dashboard used for system-wide configuration, node deployment, event management, organization creation, and staff provisioning.
 - **Advanced UI/UX Architecture:**
   - Ultra-premium, dark-mode, cinematic aesthetics.
   - Hardware Acceleration: Complex visual effects like moving CSS Gaussian blurs have been eliminated in favor of Framer Motion and GPU-accelerated concurrent z-index fading and ambient-aurora gradients.
   - Graceful UI Degradation across varying network and device capabilities.
   - Custom React Server Components and Next.js App Router for high-performance navigation and rendering.
-- **Global Directory:** Public-facing hub for discovering and accessing events.
+- **Global Directory & Edge Routing:** Public-facing hub for discovering events, combined with Vercel Edge Middleware (`proxy.js`) for dynamic custom domain resolution directly mapped to specific event Nodes.
 - **Telemetry Rule:** Comprehensive server-side logging at every step of the backend data pipeline.
-- **The Abyss (Transport Layer):** WebSocket and Valkey (Redis) integration for real-time mesh connectivity. Ephemeral event meshes and direct messaging between guests.
+- **The Abyss (Transport Layer):** WebSocket and Valkey (Redis) integration for real-time mesh connectivity. Supports ephemeral event meshes and direct messaging between guests with horizontal scaling capabilities.
 
 ## Complete Project Structure
 
@@ -38,14 +38,16 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 │       │   ├── abyssController.js
 │       │   ├── authController.js
 │       │   ├── eventController.js
-│       │   └── guestController.js
+│       │   ├── guestController.js
+│       │   └── tenantController.js
 │       ├── middleware
 │       │   ├── authMiddleware.js
 │       │   └── socketAuth.js
 │       ├── routes
 │       │   ├── authRoutes.js
 │       │   ├── eventRoutes.js
-│       │   └── guestRoutes.js
+│       │   ├── guestRoutes.js
+│       │   └── tenantRoutes.js
 │       ├── server.js
 │       ├── services
 │       │   ├── emailService.js
@@ -114,6 +116,7 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 │       │       └── luma-dropdown.jsx
 │       ├── lib
 │       │   └── utils.js
+│       ├── proxy.js
 │       └── services
 │           └── api.js
 └── prompt.md
@@ -122,18 +125,18 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 ## Detailed File and Folder Definitions
 
 ### Root Level
-- **`. `**: The root of the project ecosystem.
+- **`.`**: The root of the project ecosystem.
 - **`README.md`**: Master architecture overview detailing main principles, global milestones, architecture terminology (Tenants/Nodes, Global Ledger, Control Plane), and tech stack.
-- **`prompt.md`**: This generated comprehensive breakdown of the project status and architecture (including the original prompt).
+- **`prompt.md`**: This generated comprehensive breakdown of the project status and architecture.
 
 ### Backend (`/backend`)
 Handles the API, PostgreSQL connectivity (Aiven), Data Layer, real-time WebSocket infrastructure (The Abyss), and strict telemetry via server-side logging. Runs on Node.js/Express.js.
 - **`backend/.gitignore`**: Excludes `node_modules`, `.env`, and other non-tracked backend assets from git.
 - **`backend/README.md`**: Details backend setup (requires Aiven DB via `pg`), folder structure, and the rigorous "Telemetry Rule".
-- **`backend/package.json` & `package-lock.json`**: Dependencies and scripts for the backend Node.js application, including express, socket.io, ioredis, pg.
+- **`backend/package.json` & `package-lock.json`**: Dependencies and scripts for the backend Node.js application, including express, socket.io, ioredis, pg, and bcrypt.
 - **`backend/migrate.js`**: Command-line entry point to manually or automatically run database migrations (calls `setupDb.js`).
 - **`backend/database/`**: Contains raw SQL files and logic for db structuring.
-  - **`init.sql`**: SQL scripts to initialize tables (e.g., `events`, `event_images`, `guests`, `event_registrations`, `direct_messages`) with precise schema constraints and foreign keys. Includes UUID extension.
+  - **`init.sql`**: SQL scripts to initialize tables (e.g., `events`, `event_images`, `guests`, `event_registrations`, `event_schedules`) with precise schema constraints and foreign keys. Includes UUID extension.
 - **`backend/scripts/`**: Utilities for initial environment bootstrapping.
   - **`setupDb.js`**: Script to connect to Aiven PostgreSQL and execute the `init.sql` blueprint to inject base records or structures upon initial setup.
 - **`backend/src/`**: Source folder for all server-side application logic.
@@ -145,13 +148,15 @@ Handles the API, PostgreSQL connectivity (Aiven), Data Layer, real-time WebSocke
     - **`authController.js`**: Handles administrative control plane authentication (Admin Login logic).
     - **`eventController.js`**: Manages full CRUD lifecycle for Event Tenants. Includes complex querying logic (`json_agg` for image associations). Uses VercelService.
     - **`guestController.js`**: Manages guest onboarding, profiles, JWT token minting, and associated records.
+    - **`tenantController.js`**: Manages Organization and User provisioning (RBAC logic). Handles creating organizations, provisioning staff, and assigning them to specific events.
   - **`middleware/`**: Request interceptors.
-    - **`authMiddleware.js`**: REST API protection. Secures admin routes with JWT verification (`requireAdminKey`) and guest routes with Anti-IDOR shields (`requireGuestToken`).
+    - **`authMiddleware.js`**: REST API protection. Secures admin routes with JWT verification, specifically enforcing Role-Based Access Control (`requireSuperadmin`, `requireTenantAdmin`) and guest routes with Anti-IDOR shields (`requireGuestToken`).
     - **`socketAuth.js`**: Perimeter defense for WebSockets. Validates JWT payloads from socket handshakes to authenticate users into The Abyss.
   - **`routes/`**: Defines HTTP API paths and routes them to appropriate controllers.
     - **`authRoutes.js`**: Routes for admin login/session creation (`/api/auth`).
     - **`eventRoutes.js`**: Routes for retrieving, modifying, creating, and deleting Events (`/api/events`).
     - **`guestRoutes.js`**: Routes for managing attendees within a node, including global admin view (`/api/guests`).
+    - **`tenantRoutes.js`**: Routes for superadmin/tenant admin management of organizations and network users (`/api/tenants`).
   - **`server.js`**: The master Control Plane boot sequence. Wraps Express with an HTTP server, configures CORS, mounts Socket.io (The Abyss), establishes Valkey scaling, mounts routes, and initiates DB/Cache uplinks.
   - **`services/`**: Encapsulates external API integrations and advanced asynchronous background tasks.
     - **`emailService.js`**: Dispatches transactional emails via direct HTTPS REST API transport (e.g. Resend) to bypass SMTP firewall issues.
@@ -209,9 +214,11 @@ The presentation layer built on Next.js 14+ App Router, utilizing React, Tailwin
       - **`luma-dropdown.jsx`**: Highly styled, Framer Motion-animated interactive dropdown menu.
   - **`lib/`**: Generic, UI-agnostic helper functions for the frontend.
     - **`utils.js`**: Common utilities exporting a `cn` function for merging Tailwind classes with `clsx` and `tailwind-merge`.
+  - **`proxy.js`**: Vercel Edge Middleware routing. Dynamically intercepts requests to custom domains and resolves them to backend Nodes/Events, injecting theme data into headers, while bypassing static files to save GPU/Network performance.
   - **`services/`**: Client-side API fetching utilities.
     - **`api.js`**: Centralized fetch wrapper exposing functions (e.g. `registerGuest`, `fetchPublicEvents`) to communicate with the backend REST endpoints. Includes response parsing and base URL sanitization.
 
 ---
 
-update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then  define each file in detail about what it does and define each folder about what it does and in the end of the file copy this prompt
+### User Prompt
+update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and in the end of the file copy this prompt
