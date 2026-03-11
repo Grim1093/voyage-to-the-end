@@ -130,8 +130,9 @@ const getNetworkUsers = async (req, res) => {
                 ORDER BY a.role, a.email;
             `;
         } else {
+            // [Architecture] Added the JOIN here so Organizers get their correct Agency name too!
             query = `
-                SELECT a.id, a.email, a.role,
+                SELECT a.id, a.email, a.role, o.name as organization_name,
                        COALESCE(
                            (SELECT json_agg(json_build_object('id', e.id, 'title', e.name))
                             FROM event_staff_assignments esa
@@ -139,6 +140,7 @@ const getNetworkUsers = async (req, res) => {
                             WHERE esa.admin_id = a.id), '[]'::json
                        ) as assignments
                 FROM admins a 
+                LEFT JOIN organizations o ON a.organization_id = o.id 
                 WHERE a.organization_id = $1 AND a.role = 'staff' 
                 ORDER BY a.email;
             `;
