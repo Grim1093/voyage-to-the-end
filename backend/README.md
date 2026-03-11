@@ -31,6 +31,12 @@ The backend is organized to cleanly separate configuration, utilities, and appli
 - `utils/logger.js`: Houses the custom logging utility utilized extensively across the application to enforce the Telemetry Rule.
 - `controllers/eventController.js`: Manages the business logic for all event-related API endpoints.
 
+## Coding Conventions
+- **Asynchronous I/O:** Favor asynchronous I/O operations (e.g., using `fs.promises.readFile`) over synchronous ones (e.g., `fs.readFileSync`) within async contexts to prevent blocking the Node.js event loop.
+
+## Testing Context
+- The backend directory currently lacks an automated test suite (no `.test.js` or `.spec.js` files found).
+
 ## The "Telemetry Rule"
 In our backend architecture, we enforce a strict **"Telemetry Rule"**:
 **Rigorous console logging is mandatory at every step of the data pipeline.**
@@ -40,3 +46,5 @@ This rule ensures comprehensive error tracking, state validation, and facilitate
 ## Current Achievements
 - **Advanced Querying:** Implemented `json_agg` subqueries to efficiently fetch arrays of images associated with events directly within the primary database queries.
 - **Timezone Enforcement:** Successfully enforced strict UTC timezone locking across all database operations, ensuring global consistency in event scheduling and registration timestamps.
+- **WebSockets (The Abyss):** The real-time messaging subsystem utilizes `@socket.io/redis-adapter` and `ioredis` (Valkey Connection Protocol) for horizontal scaling.
+- **`guestLogin` Upgrade Path:** An automatic upgrade path is in place for legacy plaintext access codes, converting them to bcrypt hashes using the `upgradeLegacyPassword` helper function during login.

@@ -28,16 +28,26 @@ To maintain consistency across the codebase, please adhere to the following term
 - **Database:** PostgreSQL (hosted on Aiven) accessed via `pg` pool.
 
 ## Database Architecture
-The Global Ledger is built on PostgreSQL with all timezones strictly locked to UTC.
+The Global Ledger is built on PostgreSQL hosted on Aiven via `pg` pool, with all timezones strictly locked to UTC.
 
 - **`events`:** `id`, `slug`, `name`, `start_date`, `end_date`, `description`, `location`, `is_public`, `created_at`.
 - **`event_images`:** `id`, `event_id` (FK CASCADE), `image_url`, `display_order`, `created_at`.
-- **`guests`:** `id`, `full_name`, `email`, `phone`, `created_at`, `updated_at`.
-- **`event_registrations`:** `id`, `guest_id` (FK), `event_id` (FK), `access_code`, `id_number`, `id_document_url`, `dietary_restrictions`, `current_state`, `error_log`, `registered_at`. (Unique constraint on `guest_id` + `event_id`).
+- **`guests` (The Global Identity Vault):** `id` (UUID), `full_name`, `email` (UNIQUE), `phone`, `created_at`, `updated_at`.
+- **`event_registrations` (The Event Junction):** `id` (UUID), `guest_id` (FK CASCADE), `event_id` (FK CASCADE), `access_code`, `id_number`, `id_document_url`, `dietary_restrictions`, `current_state`, `error_log`, `registered_at`. (Unique constraint on `guest_id` + `event_id` to prevent duplicate registrations).
+- **`event_schedules` (The Itinerary Engine):** `id` (UUID), `event_id` (FK CASCADE), `title`, `description`, `speaker_name`, `location`, `start_time`, `end_time`, `created_at`, `updated_at`.
+
+## Role-Based Access Control (RBAC)
+The platform supports RBAC with isolated Organization nodes, specifically defined as:
+- **Superadmins**
+- **Tenant Admins**
+- **Event Staff**
+
+## Architectural Subsystems
+- **Abyss Core:** An ephemeral state engine subsystem handling real-time features. It utilizes WebSockets (Socket.io) and Redis.
 
 ## Master Folder Structure
 ```
 .
-├── backend/    # API, Data Layer, and Telemetry
+├── backend/    # API, Data Layer, Telemetry, and Websockets
 └── frontend/   # Client-Side Architecture, Routing, and UI/UX Philosophy
 ```
