@@ -55,21 +55,23 @@ const getAllAdminEvents = async (req, res) => {
 
         // ARCHITECTURE: Three-Tiered Ledger Resolution
         if (req.admin.role === 'superadmin') {
+            // [Architecture] Modified to LEFT JOIN organizations for Superadmin grouped multi-tenant UI
             query = `
                 SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
-                       e.custom_domain, e.theme_config,
+                       e.custom_domain, e.theme_config, e.organization_id, o.name as organization_name,
                        (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
                        COALESCE(
                            (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
                             FROM event_images ei WHERE ei.event_id = e.id), '[]'::json
                        ) as images
                 FROM events e
+                LEFT JOIN organizations o ON e.organization_id = o.id
                 ORDER BY e.created_at DESC;
             `;
         } else if (req.admin.role === 'tenant_admin') {
             query = `
                 SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
-                       e.custom_domain, e.theme_config,
+                       e.custom_domain, e.theme_config, e.organization_id,
                        (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
                        COALESCE(
                            (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 
@@ -84,7 +86,7 @@ const getAllAdminEvents = async (req, res) => {
             // Ground Nodes ONLY see explicitly mapped assignments
             query = `
                 SELECT e.id, e.slug, e.name as title, e.start_date, e.end_date, e.description as desc, e.location, e.is_public,
-                       e.custom_domain, e.theme_config,
+                       e.custom_domain, e.theme_config, e.organization_id,
                        (e.end_date IS NOT NULL AND e.end_date < CURRENT_TIMESTAMP) as is_expired,
                        COALESCE(
                            (SELECT json_agg(ei.image_url ORDER BY ei.display_order) 

@@ -8,6 +8,16 @@ import { createEvent } from '../../../../services/api';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
 
+// [Architecture] Curated MSaaS Theme Engine Presets (Dimensional)
+const THEME_PRESETS = [
+    { name: 'Abyssal Void', config: { background: '#09090b', text: '#ffffff', primary: '#8b5cf6', accent: '#3b82f6', fontFamily: 'sans', radius: 'full', texture: 'none' } },
+    { name: 'Royal Crimson', config: { background: '#1a0a0c', text: '#fde68a', primary: '#e11d48', accent: '#d97706', fontFamily: 'serif', radius: 'sm', texture: 'grain' } },
+    { name: 'Slaughterhouse', config: { background: '#050000', text: '#e5e5e5', primary: '#991b1b', accent: '#dc2626', fontFamily: 'mono', radius: 'none', texture: 'grain' } },
+    { name: 'Tokyo Bubblegum', config: { background: '#2e1065', text: '#fdf4ff', primary: '#f472b6', accent: '#2dd4bf', fontFamily: 'sans', radius: 'full', texture: 'dots' } },
+    { name: 'Neural Hack', config: { background: '#022c22', text: '#a7f3d0', primary: '#10b981', accent: '#34d399', fontFamily: 'mono', radius: 'none', texture: 'grid' } },
+    { name: 'Mariana Trench', config: { background: '#082f49', text: '#e0f2fe', primary: '#0ea5e9', accent: '#06b6d4', fontFamily: 'sans', radius: 'sm', texture: 'none' } },
+];
+
 export default function NewEventDeployment() {
     const context = '[Event Deployment Console]';
     const router = useRouter();
@@ -26,7 +36,10 @@ export default function NewEventDeployment() {
             background: '#09090b',
             text: '#ffffff',
             primary: '#8b5cf6',
-            accent: '#3b82f6'
+            accent: '#3b82f6',
+            fontFamily: 'sans',
+            radius: 'full',
+            texture: 'none'
         }
     });
 
@@ -81,10 +94,21 @@ export default function NewEventDeployment() {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            themeConfig: {
-                ...prev.themeConfig,
-                [name]: value
-            }
+            themeConfig: { ...prev.themeConfig, [name]: value }
+        }));
+    };
+
+    const handleDimensionalChange = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            themeConfig: { ...prev.themeConfig, [field]: value }
+        }));
+    };
+
+    const applyThemePreset = (presetConfig) => {
+        setFormData(prev => ({
+            ...prev,
+            themeConfig: { ...presetConfig }
         }));
     };
 
@@ -113,7 +137,6 @@ export default function NewEventDeployment() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log(`${context} Step 1: Committing new tenant deployment...`, formData);
         
         if (!formData.name || !formData.slug) {
             setStatus('error');
@@ -131,7 +154,6 @@ export default function NewEventDeployment() {
 
         setStatus('loading');
         try {
-            console.log(`${context} Step 1.5: Applying timezone locks to payload...`);
             const payload = {
                 ...formData,
                 startDate: formData.startDate ? new Date(formData.startDate).toISOString() : null,
@@ -139,24 +161,16 @@ export default function NewEventDeployment() {
             };
 
             await createEvent(payload);
-            console.log(`${context} Step 2: Tenant deployed successfully.`);
             setStatus('success');
             setMessage(`Tenant "${formData.name}" has been successfully provisioned.`);
         } catch (error) {
-            console.error(`${context} Failure Point EV-Deploy: Deployment failed.`, error);
             setStatus('error');
             setMessage(error.message || 'Failed to deploy the new event. The slug might already exist.');
         }
     };
 
-    const staggerContainer = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
-    const itemVariant = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-    };
+    const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+    const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
     if (status === 'success') {
         return (
@@ -213,105 +227,110 @@ export default function NewEventDeployment() {
                 variants={staggerContainer}
                 initial="hidden"
                 animate="show"
-                className="max-w-2xl w-full z-10 relative px-6 pb-16 pt-8"
+                className="max-w-5xl w-full z-10 relative px-6 pb-16 pt-4"
             >
                 <motion.div variants={itemVariant} className="bg-white/[0.01] backdrop-blur-xl rounded-[40px] border border-white/[0.05] overflow-hidden shadow-2xl relative group transition-all duration-500 hover:shadow-[0_0_30px_rgba(34,211,238,0.05)]">
                     
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
 
-                    <form onSubmit={handleSubmit} className="p-10 space-y-10 relative z-10">
+                    <form onSubmit={handleSubmit} className="p-8 sm:p-10 space-y-8 relative z-10">
                         {status === 'error' && (
                             <div className="p-4 bg-rose-500/5 border border-rose-500/10 text-rose-400/80 text-xs font-medium rounded-2xl tracking-wide">
                                 {message}
                             </div>
                         )}
 
-                        <div className="space-y-8">
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Event Title</label>
-                                <input 
-                                    type="text" 
-                                    name="name"
-                                    value={formData.name}
-                                    onChange={handleNameChange}
-                                    placeholder="e.g., Global Tech Summit 2026"
-                                    required
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">URL Slug</label>
-                                <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/30 transition-all shadow-inner">
-                                    <span className="flex items-center pl-6 pr-2 text-zinc-600 text-[10px] font-mono uppercase tracking-tight">
-                                        node/
-                                    </span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                            {/* Left Column */}
+                            <div className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Event Title</label>
                                     <input 
                                         type="text" 
-                                        name="slug"
-                                        value={formData.slug}
-                                        onChange={handleSlugChange}
-                                        placeholder="global-tech-summit"
+                                        name="name"
+                                        value={formData.name}
+                                        onChange={handleNameChange}
+                                        placeholder="e.g., Global Tech Summit 2026"
                                         required
-                                        className="w-full bg-transparent text-white px-0 py-4 focus:outline-none font-mono text-sm"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
                                     />
                                 </div>
-                                <p className="text-[10px] text-zinc-600 ml-4 font-mono">Routing Path: /{formData.slug || '...'}</p>
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Start Time</label>
-                                    <input 
-                                        type="datetime-local" 
-                                        name="startDate"
-                                        value={formData.startDate}
-                                        onChange={handleChange}
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner [color-scheme:dark]"
-                                    />
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">URL Slug</label>
+                                    <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/30 transition-all shadow-inner">
+                                        <span className="flex items-center pl-6 pr-2 text-zinc-600 text-[10px] font-mono uppercase tracking-tight">
+                                            node/
+                                        </span>
+                                        <input 
+                                            type="text" 
+                                            name="slug"
+                                            value={formData.slug}
+                                            onChange={handleSlugChange}
+                                            placeholder="global-tech-summit"
+                                            required
+                                            className="w-full bg-transparent text-white px-0 py-4 focus:outline-none font-mono text-sm"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-zinc-600 ml-4 font-mono">Path: /{formData.slug || '...'}</p>
                                 </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Start Time</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            name="startDate"
+                                            value={formData.startDate}
+                                            onChange={handleChange}
+                                            className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-5 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-xs shadow-inner [color-scheme:dark]"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">End Time</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            name="endDate"
+                                            value={formData.endDate}
+                                            onChange={handleChange}
+                                            className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-5 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-xs shadow-inner [color-scheme:dark]"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column */}
+                            <div className="space-y-6">
                                 <div className="space-y-2">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">End Time</label>
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Location</label>
                                     <input 
-                                        type="datetime-local" 
-                                        name="endDate"
-                                        value={formData.endDate}
+                                        type="text" 
+                                        name="location"
+                                        value={formData.location}
                                         onChange={handleChange}
-                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm shadow-inner [color-scheme:dark]"
+                                        placeholder="New Delhi, India"
+                                        className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    />
+                                </div>
+
+                                <div className="space-y-2 h-[calc(100%-84px)]">
+                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Description</label>
+                                    <textarea 
+                                        name="description"
+                                        value={formData.description}
+                                        onChange={handleChange}
+                                        placeholder="Describe the node's purpose..."
+                                        className="w-full h-full min-h-[120px] bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm resize-none placeholder-zinc-700 shadow-inner"
                                     />
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Location</label>
-                                <input 
-                                    type="text" 
-                                    name="location"
-                                    value={formData.location}
-                                    onChange={handleChange}
-                                    placeholder="New Delhi, India"
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm placeholder-zinc-700 shadow-inner"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Description</label>
-                                <textarea 
-                                    name="description"
-                                    value={formData.description}
-                                    onChange={handleChange}
-                                    placeholder="Describe the node's purpose..."
-                                    rows="3"
-                                    className="w-full bg-white/[0.02] border border-white/[0.05] text-white rounded-[32px] px-6 py-5 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/30 transition-all text-sm resize-none placeholder-zinc-700 shadow-inner"
-                                />
-                            </div>
-
-                            {/* ARCHITECTURE: MSaaS Edge Configuration */}
-                            <div className="space-y-8 pt-8 border-t border-white/[0.03]">
-                                <div className="flex justify-between items-end ml-2 mb-2">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">MSaaS Edge Configuration</label>
-                                </div>
-
+                        {/* Middle Section: Networking & Visuals */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 pt-6 border-t border-white/[0.03]">
+                            
+                            {/* Domain & Visibility */}
+                            <div className="space-y-6">
                                 <div className="space-y-2">
                                     <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Custom Domain Routing</label>
                                     <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-full overflow-hidden focus-within:ring-1 focus-within:ring-cyan-500/50 focus-within:border-cyan-500/30 transition-all shadow-inner">
@@ -323,131 +342,14 @@ export default function NewEventDeployment() {
                                             name="customDomain"
                                             value={formData.customDomain}
                                             onChange={handleChange}
-                                            placeholder="events.yourbrand.com (Leave blank for default slug)"
+                                            placeholder="events.brand.com"
                                             className="w-full bg-transparent text-white px-0 py-4 focus:outline-none text-sm placeholder-zinc-700"
                                         />
                                     </div>
                                     <p className="text-[10px] text-zinc-600 ml-4">DNS CNAME must be routed to Vercel/Render Edge proxy.</p>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Tenant Brand Aesthetics</label>
-                                    
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Background</span>
-                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.background}</span>
-                                            </div>
-                                            <input 
-                                                type="color" name="background" value={formData.themeConfig.background} onChange={handleThemeChange} 
-                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
-                                            />
-                                        </div>
-
-                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Text / Typeface</span>
-                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.text}</span>
-                                            </div>
-                                            <input 
-                                                type="color" name="text" value={formData.themeConfig.text} onChange={handleThemeChange} 
-                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
-                                            />
-                                        </div>
-
-                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Core (Primary)</span>
-                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.primary}</span>
-                                            </div>
-                                            <input 
-                                                type="color" name="primary" value={formData.themeConfig.primary} onChange={handleThemeChange} 
-                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
-                                            />
-                                        </div>
-
-                                        <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner">
-                                            <div className="flex flex-col">
-                                                <span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Portal (Accent)</span>
-                                                <span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.accent}</span>
-                                            </div>
-                                            <input 
-                                                type="color" name="accent" value={formData.themeConfig.accent} onChange={handleThemeChange} 
-                                                className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner" 
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4 pt-4 border-t border-white/[0.03]">
-                                <div className="flex justify-between items-end ml-2 mb-2">
-                                    <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Atmospheric Images</label>
-                                </div>
-
-                                <div className="flex items-start gap-3 p-4 rounded-2xl border border-amber-500/20 bg-amber-500/5 shadow-[inset_0_0_20px_rgba(245,158,11,0.02)]">
-                                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                    </svg>
-                                    <div>
-                                        <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-widest mb-1">Orientation Protocol</h4>
-                                        <p className="text-[11px] text-amber-500/80 leading-relaxed font-mono">
-                                            The Hero Engine strictly requires <span className="text-amber-400 font-bold">Landscape (16:9)</span> images. Uploading Vertical/Portrait images will cause severe cropping and visual degradation across the global network.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="flex gap-3">
-                                    <input 
-                                        type="url" 
-                                        value={currentImageUrl}
-                                        onChange={(e) => setCurrentImageUrl(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAddImage(e)}
-                                        placeholder="https://hosted-image-url.com/node.jpg"
-                                        className="flex-1 bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-6 py-4 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
-                                    />
-                                    <button 
-                                        type="button"
-                                        onClick={handleAddImage}
-                                        disabled={!currentImageUrl.trim()}
-                                        className="px-6 rounded-full bg-white/[0.05] hover:bg-cyan-500/20 border border-white/[0.05] hover:border-cyan-500/30 text-zinc-300 hover:text-cyan-400 font-bold text-[10px] uppercase tracking-widest transition-all disabled:opacity-30"
-                                    >
-                                        Attach
-                                    </button>
-                                </div>
-                                
-                                {formData.images.length > 0 && (
-                                    <div className="flex gap-4 overflow-x-auto pb-4 pt-2 custom-scrollbar">
-                                        <AnimatePresence>
-                                            {formData.images.map((url, index) => (
-                                                <motion.div 
-                                                    key={`${url}-${index}`}
-                                                    initial={{ opacity: 0, scale: 0.8 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    exit={{ opacity: 0, scale: 0.8 }}
-                                                    className="relative w-32 h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/[0.1] group/img"
-                                                >
-                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                    <img src={url} alt="Attached Node" className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => handleRemoveImage(index)}
-                                                            className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                        </button>
-                                                    </div>
-                                                </motion.div>
-                                            ))}
-                                        </AnimatePresence>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="pt-6 border-t border-white/[0.03]">
-                                <label className="flex items-center cursor-pointer group">
+                                <label className="flex items-center cursor-pointer group mt-4">
                                     <div className="relative">
                                         <input 
                                             type="checkbox" 
@@ -465,26 +367,157 @@ export default function NewEventDeployment() {
                                     </div>
                                 </label>
                             </div>
+
+                            {/* Images */}
+                            <div className="space-y-4">
+                                <div className="flex items-start gap-3 p-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 shadow-[inset_0_0_20px_rgba(245,158,11,0.02)]">
+                                    <svg className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <h4 className="text-[11px] font-bold text-amber-500 uppercase tracking-widest mb-1">Orientation Protocol</h4>
+                                        <p className="text-[10px] text-amber-500/80 leading-relaxed font-mono">
+                                            The Hero Engine requires <span className="text-amber-400 font-bold">Landscape (16:9)</span> images. Vertical images will cause UI degradation.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3">
+                                    <input 
+                                        type="url" 
+                                        value={currentImageUrl}
+                                        onChange={(e) => setCurrentImageUrl(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleAddImage(e)}
+                                        placeholder="https://hosted-image-url.com/node.jpg"
+                                        className="flex-1 bg-white/[0.02] border border-white/[0.05] text-white rounded-full px-5 py-3 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 transition-all text-sm placeholder-zinc-700 shadow-inner"
+                                    />
+                                    <button 
+                                        type="button"
+                                        onClick={handleAddImage}
+                                        disabled={!currentImageUrl.trim()}
+                                        className="px-5 rounded-full bg-white/[0.05] hover:bg-cyan-500/20 border border-white/[0.05] hover:border-cyan-500/30 text-zinc-300 hover:text-cyan-400 font-bold text-[10px] uppercase tracking-widest transition-all disabled:opacity-30"
+                                    >
+                                        Attach
+                                    </button>
+                                </div>
+                                
+                                {formData.images.length > 0 && (
+                                    <div className="flex gap-4 overflow-x-auto pb-2 pt-1 custom-scrollbar">
+                                        <AnimatePresence>
+                                            {formData.images.map((url, index) => (
+                                                <motion.div 
+                                                    key={`${url}-${index}`}
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    exit={{ opacity: 0, scale: 0.8 }}
+                                                    className="relative w-24 h-16 rounded-xl overflow-hidden flex-shrink-0 border border-white/[0.1] group/img"
+                                                >
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img src={url} alt="Attached Node" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleRemoveImage(index)}
+                                                            className="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
+                                                        >
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                                        </button>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Theme Configurations: Dimensional Customization Engine */}
+                        <div className="space-y-6 pt-6 border-t border-white/[0.03]">
+                            <div>
+                                <label className="block text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2 mb-3">Tenant Brand Aesthetics</label>
+                                
+                                <div className="mb-6 flex flex-wrap gap-3 ml-2">
+                                    {THEME_PRESETS.map((preset) => (
+                                        <button
+                                            key={preset.name}
+                                            type="button"
+                                            onClick={() => applyThemePreset(preset.config)}
+                                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] transition-all group"
+                                        >
+                                            <div className="w-3.5 h-3.5 rounded-full border border-white/[0.1]" style={{ background: `linear-gradient(135deg, ${preset.config.primary}, ${preset.config.accent})` }} />
+                                            <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 tracking-wide">{preset.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner transition-colors">
+                                    <div className="flex flex-col"><span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Background</span><span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.background}</span></div>
+                                    <input type="color" name="background" value={formData.themeConfig.background} onChange={handleThemeChange} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner transition-colors" />
+                                </div>
+                                <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner transition-colors">
+                                    <div className="flex flex-col"><span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Text / Type</span><span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.text}</span></div>
+                                    <input type="color" name="text" value={formData.themeConfig.text} onChange={handleThemeChange} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner transition-colors" />
+                                </div>
+                                <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner transition-colors">
+                                    <div className="flex flex-col"><span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Core (Pri)</span><span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.primary}</span></div>
+                                    <input type="color" name="primary" value={formData.themeConfig.primary} onChange={handleThemeChange} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner transition-colors" />
+                                </div>
+                                <div className="bg-white/[0.02] border border-white/[0.05] rounded-2xl p-4 flex items-center justify-between shadow-inner transition-colors">
+                                    <div className="flex flex-col"><span className="text-[9px] text-zinc-500 uppercase tracking-widest font-bold mb-1">Portal (Acc)</span><span className="text-xs text-zinc-400 font-mono uppercase">{formData.themeConfig.accent}</span></div>
+                                    <input type="color" name="accent" value={formData.themeConfig.accent} onChange={handleThemeChange} className="w-8 h-8 rounded-full cursor-pointer bg-transparent border-0 p-0 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:border-none [&::-webkit-color-swatch]:rounded-full shadow-inner transition-colors" />
+                                </div>
+                            </div>
+
+                            {/* Architectural & Structural Properties */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                                <div className="space-y-3">
+                                    <label className="block text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Typography Engine</label>
+                                    <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-2xl p-1 shadow-inner">
+                                        {['sans', 'serif', 'mono'].map(font => (
+                                            <button
+                                                key={font} type="button" onClick={() => handleDimensionalChange('fontFamily', font)}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all ${formData.themeConfig.fontFamily === font ? 'bg-white/[0.1] text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            >
+                                                {font}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="block text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">UI Geometry (Radius)</label>
+                                    <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-2xl p-1 shadow-inner">
+                                        {[{val: 'none', label: 'Sharp'}, {val: 'sm', label: 'Structured'}, {val: 'full', label: 'Fluid'}].map(rad => (
+                                            <button
+                                                key={rad.val} type="button" onClick={() => handleDimensionalChange('radius', rad.val)}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all ${formData.themeConfig.radius === rad.val ? 'bg-white/[0.1] text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            >
+                                                {rad.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    <label className="block text-[9px] font-bold text-zinc-500 uppercase tracking-[0.2em] ml-2">Surface Texture</label>
+                                    <div className="flex bg-white/[0.02] border border-white/[0.05] rounded-2xl p-1 shadow-inner">
+                                        {['none', 'grid', 'dots', 'grain'].map(tex => (
+                                            <button
+                                                key={tex} type="button" onClick={() => handleDimensionalChange('texture', tex)}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all ${formData.themeConfig.texture === tex ? 'bg-white/[0.1] text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                            >
+                                                {tex}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="pt-8 border-t border-white/[0.03] flex justify-end gap-4 items-center">
-                            <Link 
-                                href="/admin"
-                                className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] hover:text-white transition-colors"
-                            >
-                                Discard Node
-                            </Link>
-                            <button 
-                                type="submit" 
-                                disabled={status === 'loading'}
-                                className="px-8 py-4 bg-white hover:bg-zinc-200 text-black rounded-full font-bold text-[10px] uppercase tracking-[0.2em] transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-[0.98] disabled:opacity-50"
-                            >
-                                {status === 'loading' ? (
-                                    <span className="flex items-center gap-2">
-                                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                        Provisioning...
-                                    </span>
-                                ) : 'Deploy Tenant'}
+                            <Link href="/admin" className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em] hover:text-white transition-colors">Discard Node</Link>
+                            <button type="submit" disabled={status === 'loading'} className="px-8 py-4 bg-white hover:bg-zinc-200 text-black rounded-full font-bold text-[10px] uppercase tracking-[0.2em] transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-[0.98] disabled:opacity-50">
+                                {status === 'loading' ? <span className="flex items-center gap-2"><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Provisioning...</span> : 'Deploy Tenant'}
                             </button>
                         </div>
                     </form>

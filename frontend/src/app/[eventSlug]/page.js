@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import { fetchEventDetails } from '../../services/api';
@@ -16,7 +16,7 @@ const EncryptedText = dynamic(
     { ssr: false }
 );
 
-// ARCHITECTURE: Full-Bleed Cinematic Hero Engine (Concurrent DOM Strategy)
+// ARCHITECTURE: Full-Bleed Cinematic Hero Engine
 const HeroSlideshow = ({ images }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
@@ -50,7 +50,7 @@ const HeroSlideshow = ({ images }) => {
                             opacity: { duration: 1.5, ease: "easeInOut" },
                             scale: { duration: 10, ease: "linear" } 
                         }}
-                        className="absolute inset-0"
+                        className="absolute inset-0 will-change-transform transform-gpu"
                     >
                         <Image 
                             src={src} 
@@ -65,11 +65,58 @@ const HeroSlideshow = ({ images }) => {
             })}
 
             {/* Hardware-Accelerated CSS Masks using dynamic tenant background */}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,var(--tenant-bg)_120%)] opacity-80 z-20" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--tenant-bg)]/60 to-[var(--tenant-bg)] z-20" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,var(--tenant-bg)_120%)] opacity-80 z-20 transform-gpu" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--tenant-bg)]/60 to-[var(--tenant-bg)] z-20 transform-gpu" />
         </div>
     );
 };
+
+// [Architecture] Dynamic Surface Texture Generator (Optimized for Zero-Lag Tab Switching)
+const SurfaceTexture = memo(({ type }) => {
+    if (!type || type === 'none') return null;
+
+    if (type === 'grid') {
+        return (
+            <div 
+                className="fixed inset-0 z-0 pointer-events-none opacity-20 transform-gpu"
+                style={{
+                    backgroundImage: `linear-gradient(to right, var(--tenant-text) 1px, transparent 1px), linear-gradient(to bottom, var(--tenant-text) 1px, transparent 1px)`,
+                    backgroundSize: '40px 40px',
+                    maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 80%)'
+                }}
+            />
+        );
+    }
+
+    if (type === 'dots') {
+        return (
+            <div 
+                className="fixed inset-0 z-0 pointer-events-none opacity-20 transform-gpu"
+                style={{
+                    backgroundImage: `radial-gradient(var(--tenant-text) 1px, transparent 1px)`,
+                    backgroundSize: '20px 20px',
+                    maskImage: 'radial-gradient(ellipse at center, black 40%, transparent 80%)'
+                }}
+            />
+        );
+    }
+
+    if (type === 'grain') {
+        // Architect Note: numOctaves reduced to 1 and animation stripped to prevent GPU memory dumping on tab switch
+        return (
+            <div 
+                className="fixed inset-0 z-10 pointer-events-none opacity-[0.05] transform-gpu mix-blend-overlay"
+                style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'repeat'
+                }}
+            />
+        );
+    }
+
+    return null;
+});
+SurfaceTexture.displayName = 'SurfaceTexture';
 
 export default function EventHub() {
     const params = useParams();
@@ -141,25 +188,51 @@ export default function EventHub() {
 
     // --- MSAAS THEME ENGINE EXTRACTOR ---
     const theme = event.theme_config || {};
-    // Extract MSaaS parameters with fallbacks to your original system defaults
+    
+    // Resolve Radius
+    let radiusVar = '32px'; // default 'full' mapping for cards
+    let buttonRadiusVar = '9999px'; // default 'full' mapping for buttons
+    if (theme.radius === 'none') {
+        radiusVar = '0px';
+        buttonRadiusVar = '0px';
+    } else if (theme.radius === 'sm') {
+        radiusVar = '8px';
+        buttonRadiusVar = '4px';
+    }
+
+    // Resolve Font Family
+    let fontClass = 'font-sans';
+    if (theme.fontFamily === 'serif') fontClass = 'font-serif';
+    if (theme.fontFamily === 'mono') fontClass = 'font-mono';
+
     const cssVariables = {
         '--tenant-bg': theme.background || '#09090b',
         '--tenant-text': theme.text || '#ffffff',
-        '--tenant-primary': theme.primary || '#8b5cf6', // The Violet Core
-        '--tenant-accent': theme.accent || '#3b82f6',   // The Blue Portal
+        '--tenant-primary': theme.primary || '#8b5cf6',
+        '--tenant-accent': theme.accent || '#3b82f6',
+        '--tenant-radius': radiusVar,
+        '--tenant-btn-radius': buttonRadiusVar
     };
 
     if (event.is_expired) {
         return (
-            <main style={cssVariables} className="min-h-screen bg-[var(--tenant-bg)] flex flex-col items-center justify-center p-4 relative overflow-hidden">
+            <main style={cssVariables} className={`min-h-screen bg-[var(--tenant-bg)] flex flex-col items-center justify-center p-4 relative overflow-hidden ${fontClass}`}>
+                <SurfaceTexture type={theme.texture} />
                 {hasImages ? <HeroSlideshow images={event.images} /> : <AmbientAurora />}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-500/[0.03] rounded-full filter blur-[150px] pointer-events-none z-0"></div>
-                <div className="bg-white/[0.02] border border-white/[0.05] rounded-[40px] p-12 max-w-md text-center backdrop-blur-2xl z-10 shadow-2xl">
-                    <h1 className="text-2xl font-medium text-[var(--tenant-text)] mb-2 tracking-tight">Event Concluded</h1>
-                    <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
-                        The timeline for <span className="text-[var(--tenant-text)] font-medium">{event.title}</span> has officially elapsed. The registration portal and guest hub are now securely locked.
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-500/[0.03] rounded-full filter blur-[150px] pointer-events-none z-0 transform-gpu"></div>
+                <div 
+                    className="bg-black/60 border border-white/[0.05] p-12 max-w-md text-center backdrop-blur-2xl z-20 shadow-2xl relative"
+                    style={{ borderRadius: 'var(--tenant-radius)' }}
+                >
+                    <h1 className="text-2xl font-bold text-[var(--tenant-text)] mb-2 tracking-tight">Event Concluded</h1>
+                    <p className="text-[var(--tenant-text)] opacity-60 text-sm mb-8 leading-relaxed font-light">
+                        The timeline for <span className="font-bold opacity-100">{event.title}</span> has officially elapsed. The registration portal and guest hub are now securely locked.
                     </p>
-                    <Link href="/" className="inline-flex w-full justify-center py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-[var(--tenant-text)] rounded-full font-bold text-[10px] uppercase tracking-widest transition-all">
+                    <Link 
+                        href="/" 
+                        className="inline-flex w-full justify-center py-4 px-6 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.05] text-[var(--tenant-text)] font-bold text-[10px] uppercase tracking-widest transition-all"
+                        style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                    >
                         Return to Global Directory
                     </Link>
                 </div>
@@ -167,31 +240,29 @@ export default function EventHub() {
         );
     }
 
-    const staggerContainer = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.15 } }
-    };
-
-    const itemVariant = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-    };
+    const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.15 } } };
+    const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
     return (
-        <main style={cssVariables} className="min-h-screen bg-[var(--tenant-bg)] flex flex-col items-center text-zinc-200 relative selection:bg-[var(--tenant-primary)]/30 overflow-hidden transition-colors duration-1000">
+        <main style={cssVariables} className={`min-h-screen bg-[var(--tenant-bg)] flex flex-col items-center text-[var(--tenant-text)] relative selection:bg-[var(--tenant-primary)]/30 overflow-hidden transition-colors duration-1000 ${fontClass}`}>
 
+            <SurfaceTexture type={theme.texture} />
             {hasImages ? <HeroSlideshow images={event.images} /> : <AmbientAurora />}
             <InteractiveAura />
 
-            <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20">
+            <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20 relative">
                 <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-[var(--tenant-text)] text-[var(--tenant-bg)] flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                    <div className="w-7 h-7 bg-[var(--tenant-text)] text-[var(--tenant-bg)] flex items-center justify-center font-bold text-[10px] tracking-tighter" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
                         NX
                     </div>
-                    <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase drop-shadow-md">Nexus</span>
+                    <span className="font-semibold text-[var(--tenant-text)] opacity-90 tracking-[0.2em] text-xs uppercase drop-shadow-md">Nexus</span>
                 </div>
                 
-                <Link href="/" className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-[var(--tenant-text)] hover:opacity-80 transition-opacity bg-black/20 hover:bg-black/40 border border-white/10 px-4 py-2 rounded-full backdrop-blur-md shadow-lg">
+                <Link 
+                    href="/" 
+                    className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-[var(--tenant-text)] hover:opacity-80 transition-opacity bg-black/20 hover:bg-black/40 border border-white/10 px-4 py-2 backdrop-blur-md shadow-lg"
+                    style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     Global Directory
                 </Link>
@@ -201,35 +272,44 @@ export default function EventHub() {
                 variants={staggerContainer}
                 initial="hidden"
                 animate="show"
-                className="max-w-4xl w-full z-10 flex flex-col items-center pb-12 pt-16 px-4"
+                className="max-w-4xl w-full z-20 flex flex-col items-center pb-12 pt-16 px-4 relative"
             >
                 <motion.div variants={itemVariant} className="text-center mb-16 space-y-4">
-                    <div className="inline-flex items-center gap-2 mb-2 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/10 text-zinc-300 text-[10px] font-bold tracking-[0.15em] uppercase shadow-lg">
+                    <div 
+                        className="inline-flex items-center gap-2 mb-2 px-3 py-1.5 bg-black/20 backdrop-blur-md border border-white/10 text-[var(--tenant-text)] opacity-80 text-[10px] font-bold tracking-[0.15em] uppercase shadow-lg"
+                        style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                    >
                         <span className="w-1.5 h-1.5 rounded-full bg-[var(--tenant-primary)] animate-pulse shadow-[0_0_10px_var(--tenant-primary)]"></span>
                         Active Tenant Portal
                     </div>
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-medium tracking-tight text-[var(--tenant-text)] leading-tight min-h-[1.2em] drop-shadow-xl">
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[var(--tenant-text)] leading-tight min-h-[1.2em] drop-shadow-xl">
                         <EncryptedText
                             text={event.title}
-                            encryptedClassName="text-zinc-400 font-mono tracking-normal"
+                            encryptedClassName="opacity-50 font-mono tracking-normal"
                             revealedClassName="text-[var(--tenant-text)]"
                             revealDelayMs={50} 
                         />
                     </h1>
-                    <p className="text-sm text-zinc-400 max-w-lg mx-auto font-normal leading-relaxed tracking-wide drop-shadow-md">
+                    <p className="text-sm text-[var(--tenant-text)] opacity-60 max-w-lg mx-auto font-normal leading-relaxed tracking-wide drop-shadow-md">
                         {event.desc || `Accessing dynamic data for the ${event.title} node.`}
                     </p>
                     
                     {(formattedDate || event.location) && (
-                        <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] text-zinc-300 mt-6 font-medium uppercase tracking-widest">
+                        <div className="flex flex-wrap items-center justify-center gap-4 text-[10px] text-[var(--tenant-text)] opacity-90 mt-6 font-medium uppercase tracking-widest">
                             {formattedDate && (
-                                <span className="flex items-center gap-2 px-4 py-2 bg-black/30 rounded-full border border-white/10 shadow-lg backdrop-blur-md">
+                                <span 
+                                    className="flex items-center gap-2 px-4 py-2 bg-black/30 border border-white/10 shadow-lg backdrop-blur-md"
+                                    style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                                >
                                     <svg className="w-3 h-3 text-[var(--tenant-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                     {formattedDate}
                                 </span>
                             )}
                             {event.location && (
-                                <span className="flex items-center gap-2 px-4 py-2 bg-black/30 rounded-full border border-white/10 shadow-lg backdrop-blur-md">
+                                <span 
+                                    className="flex items-center gap-2 px-4 py-2 bg-black/30 border border-white/10 shadow-lg backdrop-blur-md"
+                                    style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                                >
                                     <svg className="w-3 h-3 text-[var(--tenant-accent)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                     {event.location}
                                 </span>
@@ -243,23 +323,29 @@ export default function EventHub() {
                     {/* Node 1: Register (Branded with Primary Color) */}
                     <motion.div variants={itemVariant}>
                         <div 
-                            className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1"
-                            style={{ '--hover-shadow': 'var(--tenant-primary)' }} // Passes color to a generic custom var
+                            className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1"
+                            style={{ '--hover-shadow': 'var(--tenant-primary)', borderRadius: 'var(--tenant-radius)' }} 
                         >
-                            {/* Injected custom hover shadow via style tag to handle dynamic hex colors safely */}
                             <style jsx>{`
                                 div.group:hover { box-shadow: 0 0 40px color-mix(in srgb, var(--hover-shadow) 20%, transparent); }
                             `}</style>
                             
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-primary) 20%, transparent), transparent)' }} />
-                            <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-primary) 10%, transparent)', animationDuration: '5s' }} />
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none transform-gpu" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-primary) 20%, transparent), transparent)' }} />
+                            <div className="absolute -bottom-32 -left-32 w-96 h-96 rounded-full blur-[100px] pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0 transform-gpu" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-primary) 10%, transparent)' }} />
 
-                            <div className="w-12 h-12 bg-white/[0.05] rounded-full flex items-center justify-center mb-6 border border-white/[0.1] relative z-10 shadow-inner">
+                            <div 
+                                className="w-12 h-12 bg-white/[0.05] flex items-center justify-center mb-6 border border-white/[0.1] relative z-10 shadow-inner"
+                                style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                            >
                                 <svg className="w-5 h-5 text-[var(--tenant-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                             </div>
-                            <h2 className="text-xl font-medium text-[var(--tenant-text)] mb-3 tracking-tight relative z-10 drop-shadow-md">Register</h2>
-                            <p className="text-zinc-400 text-xs mb-8 flex-grow leading-relaxed relative z-10">Secure your clearance for this event. Submit your identity document for ledger verification.</p>
-                            <Link href={`/${eventSlug}/register`} className="w-full py-3 px-4 rounded-full font-bold text-[11px] uppercase tracking-wider transition-all relative z-10 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95 text-black hover:opacity-90" style={{ backgroundColor: 'var(--tenant-text)' }}>
+                            <h2 className="text-xl font-bold text-[var(--tenant-text)] mb-3 tracking-tight relative z-10 drop-shadow-md">Register</h2>
+                            <p className="text-[var(--tenant-text)] opacity-60 text-xs mb-8 flex-grow leading-relaxed relative z-10">Secure your clearance for this event. Submit your identity document for ledger verification.</p>
+                            <Link 
+                                href={`/${eventSlug}/register`} 
+                                className="w-full py-3 px-4 font-bold text-[11px] uppercase tracking-wider transition-all relative z-10 shadow-[0_0_20px_rgba(255,255,255,0.1)] active:scale-95 text-[var(--tenant-bg)] hover:opacity-90" 
+                                style={{ backgroundColor: 'var(--tenant-text)', borderRadius: 'var(--tenant-btn-radius)' }}
+                            >
                                 Start Registration
                             </Link>
                         </div>
@@ -268,22 +354,29 @@ export default function EventHub() {
                     {/* Node 2: Portal (Branded with Accent Color) */}
                     <motion.div variants={itemVariant}>
                         <div 
-                            className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] rounded-[32px] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1"
-                            style={{ '--hover-shadow': 'var(--tenant-accent)' }}
+                            className="group relative overflow-hidden bg-black/40 backdrop-blur-2xl border border-white/[0.08] p-8 flex flex-col items-center text-center transition-all duration-300 ease-out hover:-translate-y-1"
+                            style={{ '--hover-shadow': 'var(--tenant-accent)', borderRadius: 'var(--tenant-radius)' }}
                         >
                             <style jsx>{`
                                 div.group:hover { box-shadow: 0 0 40px color-mix(in srgb, var(--hover-shadow) 20%, transparent); }
                             `}</style>
                             
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-accent) 20%, transparent), transparent)' }} />
-                            <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-accent) 10%, transparent)', animationDuration: '6s' }} />
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none transform-gpu" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-accent) 20%, transparent), transparent)' }} />
+                            <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full blur-[100px] pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0 transform-gpu" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-accent) 10%, transparent)' }} />
 
-                            <div className="w-12 h-12 bg-white/[0.05] rounded-full flex items-center justify-center mb-6 border border-white/[0.1] relative z-10 shadow-inner">
+                            <div 
+                                className="w-12 h-12 bg-white/[0.05] flex items-center justify-center mb-6 border border-white/[0.1] relative z-10 shadow-inner"
+                                style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                            >
                                 <svg className="w-5 h-5 text-[var(--tenant-text)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             </div>
-                            <h2 className="text-xl font-medium text-[var(--tenant-text)] mb-3 tracking-tight relative z-10 drop-shadow-md">Portal</h2>
-                            <p className="text-zinc-400 text-xs mb-8 flex-grow leading-relaxed relative z-10">Already committed to the ledger? View your live verification state and event dashboard.</p>
-                            <Link href={`/${eventSlug}/portal`} className="w-full py-3 px-4 bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.1] rounded-full font-bold text-[11px] uppercase tracking-wider transition-all relative z-10 active:scale-95" style={{ color: 'var(--tenant-text)' }}>
+                            <h2 className="text-xl font-bold text-[var(--tenant-text)] mb-3 tracking-tight relative z-10 drop-shadow-md">Portal</h2>
+                            <p className="text-[var(--tenant-text)] opacity-60 text-xs mb-8 flex-grow leading-relaxed relative z-10">Already committed to the ledger? View your live verification state and event dashboard.</p>
+                            <Link 
+                                href={`/${eventSlug}/portal`} 
+                                className="w-full py-3 px-4 bg-white/[0.05] hover:bg-white/[0.15] border border-white/[0.1] font-bold text-[11px] uppercase tracking-wider transition-all relative z-10 active:scale-95" 
+                                style={{ color: 'var(--tenant-text)', borderRadius: 'var(--tenant-btn-radius)' }}
+                            >
                                 Enter Portal
                             </Link>
                         </div>
