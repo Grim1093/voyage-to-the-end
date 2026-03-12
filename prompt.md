@@ -3,7 +3,7 @@
 ## Main Goal
 The core goal of this repository is to provide a high-end, multi-tenant MICE (Meetings, Incentives, Conferences, and Exhibitions) platform. It operates as a Multi-Software as a Service (MSaaS) and is engineered to deliver unparalleled performance and visual fidelity for premium events.
 
-## What is done & Capabilities
+## What is done in the project & Capabilities
 - **Multi-Tenant Architecture:** Capable of hosting isolated events (Tenants/Nodes) within a broader MSaaS ecosystem. Includes a comprehensive RBAC (Role-Based Access Control) system supporting Superadmins, Tenant Admins, and Event Staff with isolated Organization nodes.
 - **Global Ledger:** Fully operational PostgreSQL database hosted on Aiven, enforcing strict UTC timezones for all timestamps.
 - **Admin Control Plane:** Live management dashboard used for system-wide configuration, node deployment, event management, organization creation, and staff provisioning.
@@ -20,268 +20,419 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 
 ```text
 .
+├── README.md
 ├── backend
-│   ├── .gitignore
-│   ├── README.md
-│   ├── database
-│   │   └── init.sql
-│   ├── migrate.js
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── scripts
-│   │   ├── printSchema.js
-│   │   └── setupDb.js
-│   └── src
-│       ├── config
-│       │   ├── cache.js
-│       │   └── db.js
-│       ├── controllers
-│       │   ├── abyssController.js
-│       │   ├── authController.js
-│       │   ├── eventController.js
-│       │   ├── guestController.js
-│       │   └── tenantController.js
-│       ├── middleware
-│       │   ├── authMiddleware.js
-│       │   └── socketAuth.js
-│       ├── routes
-│       │   ├── authRoutes.js
-│       │   ├── eventRoutes.js
-│       │   ├── guestRoutes.js
-│       │   └── tenantRoutes.js
-│       ├── server.js
-│       ├── services
-│       │   ├── emailService.js
-│       │   ├── meshDissolver.js
-│       │   └── vercelService.js
-│       └── utils
-│           ├── createAdmin.js
-│           ├── logger.js
-│           ├── migrateAbyss.js
-│           └── migrateThemes.js
+│   ├── .gitignore
+│   ├── README.md
+│   ├── database
+│   │   └── init.sql
+│   ├── migrate.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── scripts
+│   │   ├── printSchema.js
+│   │   └── setupDb.js
+│   └── src
+│       ├── config
+│       │   ├── cache.js
+│       │   └── db.js
+│       ├── controllers
+│       │   ├── abyssController.js
+│       │   ├── authController.js
+│       │   ├── eventController.js
+│       │   ├── guestController.js
+│       │   └── tenantController.js
+│       ├── middleware
+│       │   ├── authMiddleware.js
+│       │   └── socketAuth.js
+│       ├── routes
+│       │   ├── authRoutes.js
+│       │   ├── eventRoutes.js
+│       │   ├── guestRoutes.js
+│       │   └── tenantRoutes.js
+│       ├── server.js
+│       ├── services
+│       │   ├── emailService.js
+│       │   ├── meshDissolver.js
+│       │   └── vercelService.js
+│       └── utils
+│           ├── createAdmin.js
+│           ├── logger.js
+│           ├── migrateAbyss.js
+│           └── migrateThemes.js
 ├── frontend
-│   ├── .gitignore
-│   ├── README.md
-│   ├── components.json
-│   ├── eslint.config.mjs
-│   ├── jsconfig.json
-│   ├── next.config.mjs
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.mjs
-│   ├── public
-│   │   ├── file.svg
-│   │   ├── globe.svg
-│   │   ├── next.svg
-│   │   ├── vercel.svg
-│   │   └── window.svg
-│   └── src
-│       ├── app
-│       │   ├── [eventSlug]
-│       │   │   ├── page.js
-│       │   │   ├── portal
-│       │   │   │   ├── dashboard
-│       │   │   │   │   └── page.js
-│       │   │   │   └── page.js
-│       │   │   └── register
-│       │   │       └── page.js
-│       │   ├── admin
-│       │   │   ├── [eventSlug]
-│       │   │   │   └── page.js
-│       │   │   ├── events
-│       │   │   │   ├── [eventSlug]
-│       │   │   │   │   └── edit
-│       │   │   │   │       └── page.js
-│       │   │   │   └── new
-│       │   │   │       └── page.js
-│       │   │   ├── login
-│       │   │   │   └── page.js
-│       │   │   └── page.js
-│       │   ├── favicon.ico
-│       │   ├── globals.css
-│       │   ├── layout.js
-│       │   ├── ledger
-│       │   │   └── page.js
-│       │   ├── page.js
-│       │   └── test-cursor
-│       │       └── page.js
-│       ├── components
-│       │   ├── AbyssProvider.jsx
-│       │   ├── GuestIntakeForm.jsx
-│       │   ├── portal
-│       │   │   ├── GlobalFeed.jsx
-│       │   │   └── GuestDirectory.jsx
-│       │   └── ui
-│       │       ├── ambient-aurora.jsx
-│       │       ├── custom-cursor.jsx
-│       │       ├── encrypted-text.jsx
-│       │       ├── interactive-aura.jsx
-│       │       └── luma-dropdown.jsx
-│       ├── lib
-│       │   └── utils.js
-│       ├── proxy.js
-│       └── services
-│           └── api.js
-└── prompt.md
+│   ├── .gitignore
+│   ├── README.md
+│   ├── components.json
+│   ├── eslint.config.mjs
+│   ├── jsconfig.json
+│   ├── next.config.mjs
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── public
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
+│   └── src
+│       ├── app
+│       │   ├── [eventSlug]
+│       │   │   ├── layout.js
+│       │   │   ├── page.js
+│       │   │   ├── portal
+│       │   │   │   ├── dashboard
+│       │   │   │   │   └── page.js
+│       │   │   │   └── page.js
+│       │   │   └── register
+│       │   │       └── page.js
+│       │   ├── admin
+│       │   │   ├── [eventSlug]
+│       │   │   │   └── page.js
+│       │   │   ├── events
+│       │   │   │   ├── [eventSlug]
+│       │   │   │   │   └── edit
+│       │   │   │   │       └── page.js
+│       │   │   │   └── new
+│       │   │   │       └── page.js
+│       │   │   ├── login
+│       │   │   │   └── page.js
+│       │   │   └── page.js
+│       │   ├── favicon.ico
+│       │   ├── globals.css
+│       │   ├── layout.js
+│       │   ├── ledger
+│       │   │   └── page.js
+│       │   ├── page.js
+│       │   └── test-cursor
+│       │       └── page.js
+│       ├── components
+│       │   ├── AbyssProvider.jsx
+│       │   ├── GuestIntakeForm.jsx
+│       │   ├── portal
+│       │   │   ├── GlobalFeed.jsx
+│       │   │   └── GuestDirectory.jsx
+│       │   └── ui
+│       │       ├── ambient-aurora.jsx
+│       │       ├── custom-cursor.jsx
+│       │       ├── encrypted-text.jsx
+│       │       ├── interactive-aura.jsx
+│       │       └── luma-dropdown.jsx
+│       ├── lib
+│       │   └── utils.js
+│       ├── proxy.js
+│       └── services
+│           └── api.js
+├── prompt.md
+└── tree.txt
+
+33 directories, 74 files
 ```
 
 ## Detailed File and Folder Definitions
 
 ### Root Folders and Files
-
-- **`.` (Root Folder):** The top-level workspace that houses the entire project, splitting the architecture into standalone `backend` and `frontend` applications.
-- **`README.md` (Root):** Master architecture overview documenting main principles, global milestones, architecture terminology (Tenants/Nodes, Global Ledger, Control Plane), and tech stack.
-- **`prompt.md` (Root):** This document itself, which contains a generated comprehensive breakdown of the project status and architecture.
+- **`. ` (Root Folder):** The top-level workspace that houses the entire project, splitting the architecture into standalone `backend` and `frontend` applications.
+- **`README.md`:** Master architecture overview documenting main principles, global milestones, architecture terminology, and tech stack.
+- **`prompt.md`:** This document itself, which contains a generated comprehensive breakdown of the project status, capabilities, architecture, and database structure.
 
 ### Backend (`/backend`)
-The backend is an Express.js Node application. It serves the REST API, manages PostgreSQL connectivity (Aiven), encapsulates the Data Layer, provides real-time WebSocket infrastructure (The Abyss), and enforces strict telemetry via server-side logging.
+The backend is an Express.js Node application. It serves the REST API, manages PostgreSQL connectivity, encapsulates the Data Layer, provides real-time WebSocket infrastructure (The Abyss), and enforces strict telemetry.
 
-- **`backend/.gitignore`:** Excludes `node_modules`, `.env`, and other untracked or sensitive backend files from version control.
-- **`backend/README.md`:** Details the specific backend setup process (requires Aiven DB via `pg`), documents the folder structure, and mandates the rigorous "Telemetry Rule."
-- **`backend/package.json`:** Defines the Node.js dependencies for the backend, such as express, socket.io, ioredis, pg, bcrypt, and configures CLI scripts (like `dev` and `start`).
-- **`backend/package-lock.json`:** Locks backend dependency versions to ensure deterministic and consistent installations across environments.
-- **`backend/migrate.js`:** A command-line script serving as an entry point to manually or automatically run database schema migrations (often calling `setupDb.js`).
+- **`backend/.gitignore`:** Excludes untracked or sensitive backend files from version control.
+- **`backend/README.md`:** Details the specific backend setup process, documents the folder structure, and mandates the rigorous "Telemetry Rule."
+- **`backend/package.json`:** Defines Node.js dependencies for the backend (express, socket.io, ioredis, pg) and configures CLI scripts.
+- **`backend/package-lock.json`:** Locks backend dependency versions to ensure deterministic installations.
+- **`backend/migrate.js`:** Command-line script serving as an entry point to manually or automatically run database schema migrations.
 
 #### Database (`backend/database`)
 Contains SQL assets to bootstrap or mutate the database state.
-- **`backend/database/init.sql`:** The master SQL script to initialize tables (e.g., `events`, `event_images`, `guests`, `event_registrations`, `event_schedules`) with precise constraints, unique indices, and foreign keys. Installs necessary PostgreSQL extensions (like UUID).
+- **`backend/database/init.sql`:** Master SQL script to initialize tables with precise constraints, unique indices, and foreign keys.
 
 #### Scripts (`backend/scripts`)
 Utilities to automate initial environment bootstrapping and maintenance.
-- **`backend/scripts/printSchema.js`:** A utility script that prints the current PostgreSQL database schema out to the console. Useful for debugging or verifying successful migrations.
-- **`backend/scripts/setupDb.js`:** A programmatic script that connects to the Aiven PostgreSQL ledger and executes the `init.sql` blueprint to inject base records or structures upon initial setup.
+- **`backend/scripts/printSchema.js`:** Utility script that prints the current PostgreSQL database schema out to the console.
+- **`backend/scripts/setupDb.js`:** Programmatic script that connects to the Aiven PostgreSQL ledger and executes the `init.sql` blueprint.
 
 #### Source Code (`backend/src`)
-The `src` folder houses all server-side application logic, separated by domain and architectural layers.
+Houses all server-side application logic, separated by domain and architectural layers.
 
 **`backend/src/config/`**
-Contains the core system connection configurations.
-- **`backend/src/config/cache.js`:** Configures and connects to the Valkey/Redis cache layer using `ioredis`. Handles error recovery and tuning for high-performance pub/sub operations.
-- **`backend/src/config/db.js`:** Configures the PostgreSQL connection pool setup using the `pg` library. Expects an SSL-secured `DATABASE_URL` for secure Aiven connectivity.
+Contains core system connection configurations.
+- **`backend/src/config/cache.js`:** Configures and connects to the Valkey/Redis cache layer using `ioredis`.
+- **`backend/src/config/db.js`:** Configures the PostgreSQL connection pool setup using the `pg` library.
 
 **`backend/src/controllers/`**
-Express route handlers that separate core business logic from routing, managing requests and responses.
-- **`backend/src/controllers/abyssController.js`:** The central control hub for The Abyss (WebSockets). Handles ephemeral mesh logic, storing and routing real-time echos, managing direct messaging, tracking socket connection states, and coordinating with `meshDissolver`.
-- **`backend/src/controllers/authController.js`:** Manages administrative control plane authentication, including handling admin login procedures and validating credentials to issue JWT access tokens.
-- **`backend/src/controllers/eventController.js`:** Handles the full CRUD lifecycle for Event Tenants. Includes complex database querying logic (`json_agg` for image associations) and dispatches Vercel Edge proxy routing updates via the Vercel Service.
-- **`backend/src/controllers/guestController.js`:** Manages attendee (guest) onboarding, ticket registrations, guest profiles, JWT token minting for attendees, and querying ephemeral state (like echos and presence).
-- **`backend/src/controllers/tenantController.js`:** Enforces RBAC logic for Organization and User provisioning. Handles creating distinct organizational tenants, provisioning staff accounts, assigning permissions to specific events, and guaranteeing database integrity during deletions.
+Express route handlers that separate core business logic from routing.
+- **`backend/src/controllers/abyssController.js`:** Central control hub for The Abyss (WebSockets). Handles ephemeral mesh logic, echos, direct messaging, and presence.
+- **`backend/src/controllers/authController.js`:** Manages administrative control plane authentication, admin login, and issuing JWT access tokens.
+- **`backend/src/controllers/eventController.js`:** Handles full CRUD lifecycle for Event Tenants and dispatches Vercel Edge proxy routing updates.
+- **`backend/src/controllers/guestController.js`:** Manages attendee onboarding, ticket registrations, guest profiles, and JWT token minting for attendees.
+- **`backend/src/controllers/tenantController.js`:** Enforces RBAC logic for Organization and User provisioning.
 
 **`backend/src/middleware/`**
-Request interceptors that authenticate and authorize requests before reaching controllers.
-- **`backend/src/middleware/authMiddleware.js`:** Secures REST API endpoints by parsing JWT tokens. Enforces Role-Based Access Control (`requireSuperadmin`, `requireTenantAdmin`) and guards against IDOR attacks by shielding guest routes (`requireGuestToken`).
-- **`backend/src/middleware/socketAuth.js`:** The perimeter defense for WebSockets. Validates JWT payloads attached to socket handshake headers to authorize users entering The Abyss.
+Request interceptors that authenticate and authorize requests.
+- **`backend/src/middleware/authMiddleware.js`:** Secures REST API endpoints by parsing JWT tokens and enforcing RBAC.
+- **`backend/src/middleware/socketAuth.js`:** Validates JWT payloads attached to socket handshake headers to authorize users entering The Abyss.
 
 **`backend/src/routes/`**
-Registers HTTP API paths and routes them directly to corresponding controller actions.
-- **`backend/src/routes/authRoutes.js`:** Binds endpoints for admin login and session creation (mounted under `/api/auth`).
-- **`backend/src/routes/eventRoutes.js`:** Binds endpoints for retrieving, updating, creating, and deleting Event data (mounted under `/api/events`).
-- **`backend/src/routes/guestRoutes.js`:** Binds endpoints for managing attendees within specific event nodes, including global admin oversight routes (mounted under `/api/guests`).
-- **`backend/src/routes/tenantRoutes.js`:** Binds endpoints for superadmin/tenant admin management of platform organizations and network staff users (mounted under `/api/tenants`).
+Registers HTTP API paths to corresponding controller actions.
+- **`backend/src/routes/authRoutes.js`:** Binds endpoints for admin login and session creation (`/api/auth`).
+- **`backend/src/routes/eventRoutes.js`:** Binds endpoints for retrieving, updating, creating, and deleting Event data (`/api/events`).
+- **`backend/src/routes/guestRoutes.js`:** Binds endpoints for managing attendees within specific event nodes (`/api/guests`).
+- **`backend/src/routes/tenantRoutes.js`:** Binds endpoints for admin management of platform organizations (`/api/tenants`).
 
 **`backend/src/server.js`**
-The master entrypoint and Control Plane boot sequence. Wraps the Express app with an HTTP server, configures CORS, mounts Socket.io (The Abyss), establishes Valkey scaling, mounts API route endpoints, starts background CRON jobs (like the `meshDissolver`), and connects the Database and Cache layers.
+Master entrypoint and Control Plane boot sequence. Wraps the Express app, mounts APIs, initializes Sockets, and connects Database and Cache layers.
 
 **`backend/src/services/`**
-Encapsulates external API integrations and advanced, asynchronous background orchestration.
-- **`backend/src/services/emailService.js`:** Dispatches transactional emails (e.g. Access Codes, Mesh Exports) utilizing a direct HTTPS REST API transport (like Resend) to effectively bypass common SMTP port blockages.
-- **`backend/src/services/meshDissolver.js`:** An ephemeral CRON background worker. It routinely queries for expired event Nodes, dissolves the ephemeral websocket mesh, persists network connections directly to the Global Ledger, and dispatches automated email exports to attendees.
-- **`backend/src/services/vercelService.js`:** Integrates directly with Vercel APIs for dynamic project infrastructure management. Used to dynamically inject and purge custom domain edge routing logic for MSaaS white-labeling.
+Encapsulates external API integrations and background orchestration.
+- **`backend/src/services/emailService.js`:** Dispatches transactional emails utilizing a direct HTTPS REST API transport.
+- **`backend/src/services/meshDissolver.js`:** Ephemeral CRON background worker that routiney queries for expired Nodes and dissolves the websocket mesh.
+- **`backend/src/services/vercelService.js`:** Integrates with Vercel APIs for dynamic custom domain edge routing logic for MSaaS white-labeling.
 
 **`backend/src/utils/`**
-Shared helper functions and standalone administrative scripts.
-- **`backend/src/utils/createAdmin.js`:** A CLI utility script to securely bcrypt hash a password and manually seed a root administrative superuser account directly into the PostgreSQL Global Ledger.
-- **`backend/src/utils/logger.js`:** Implements the required "Telemetry Rule." Provides a standardized logging mechanism utilizing formatted timestamps, execution context tagging, and clear log levels (INFO, WARN, ERROR).
-- **`backend/src/utils/migrateAbyss.js`:** An ad-hoc database schema mutation script that adds the `mesh_dissolved` boolean state to track The Abyss lifecycle in the database.
-- **`backend/src/utils/migrateThemes.js`:** An ad-hoc schema migration script that expands the MSaaS platform for Edge-Rendering configurations, adding domain routing identifiers and theme configuration columns.
+Shared helper functions and administrative scripts.
+- **`backend/src/utils/createAdmin.js`:** CLI utility script to manually seed a root administrative superuser into the Ledger.
+- **`backend/src/utils/logger.js`:** Implements standardized telemetry logging.
+- **`backend/src/utils/migrateAbyss.js`:** Database schema mutation script adding `mesh_dissolved` boolean state.
+- **`backend/src/utils/migrateThemes.js`:** Schema migration script expanding the MSaaS platform for Edge-Rendering configurations.
 
 ### Frontend (`/frontend`)
-The presentation layer built on the Next.js 14+ App Router, utilizing React, Tailwind CSS v4, and Framer Motion. Engineered specifically for GPU performance optimization and delivering cinematic UI/UX visuals.
+The presentation layer built on the Next.js 14+ App Router, utilizing React, Tailwind CSS v4, and Framer Motion. Engineered for GPU optimization.
 
-- **`frontend/.gitignore`:** Excludes local build directories (`.next`), node modules (`node_modules`), and secrets from version control.
-- **`frontend/README.md`:** Details the frontend tech stack, setup process, UI architecture philosophies (such as hardware acceleration), the App Router file layout, and animation capabilities using Framer Motion.
-- **`frontend/components.json`:** Contains configuration for Shadcn/UI integration, linking generic component aliases to actual standard local folder paths.
-- **`frontend/eslint.config.mjs`:** Custom ESLint configuration leveraging Next.js Core Web Vitals rules to ensure code quality and performance standards.
-- **`frontend/jsconfig.json`:** Configures JavaScript path aliases (like mapping `@/*` to `./src/*`), cleaning up module imports across the source code.
-- **`frontend/next.config.mjs`:** The core Next.js framework configuration. Exposes necessary environment variables and specifically whitelists remote image source patterns from domains like `i.postimg.cc`.
-- **`frontend/package.json`:** Declares frontend Node.js dependencies (e.g., Tailwind, Framer Motion, Next.js, socket.io-client) and defines project npm scripts (like `dev`, `build`, `start`, and `test`).
-- **`frontend/package-lock.json`:** Locks frontend dependency versions ensuring stable UI builds across all deployment environments.
-- **`frontend/postcss.config.mjs`:** Configures the PostCSS loader toolchain, integrating the `@tailwindcss/postcss` plugin to parse Tailwind utility classes.
+- **`frontend/.gitignore`:** Excludes local build directories and node modules from version control.
+- **`frontend/README.md`:** Details the frontend tech stack, setup process, and UI architecture philosophies.
+- **`frontend/components.json`:** Configuration for Shadcn/UI integration.
+- **`frontend/eslint.config.mjs`:** Custom ESLint configuration leveraging Next.js Core Web Vitals rules.
+- **`frontend/jsconfig.json`:** Configures JavaScript path aliases.
+- **`frontend/next.config.mjs`:** Core Next.js framework configuration exposing environment variables and whitelisting image sources.
+- **`frontend/package.json`:** Declares frontend Node.js dependencies and project npm scripts.
+- **`frontend/package-lock.json`:** Locks frontend dependency versions.
+- **`frontend/postcss.config.mjs`:** Configures PostCSS loader toolchain for Tailwind CSS.
 
 #### Public Assets (`frontend/public/`)
 Static public assets served directly by the web server.
-- **`frontend/public/file.svg`:** A standard placeholder file icon.
-- **`frontend/public/globe.svg`:** A standard globe icon vector graphic.
-- **`frontend/public/next.svg`:** The Next.js brand logo vector.
-- **`frontend/public/vercel.svg`:** The Vercel brand logo vector.
-- **`frontend/public/window.svg`:** A standard placeholder window icon graphic.
+- **`frontend/public/file.svg`:** Standard placeholder file icon.
+- **`frontend/public/globe.svg`:** Standard globe icon vector graphic.
+- **`frontend/public/next.svg`:** Next.js brand logo vector.
+- **`frontend/public/vercel.svg`:** Vercel brand logo vector.
+- **`frontend/public/window.svg`:** Standard placeholder window icon graphic.
 
 #### Source Code (`frontend/src/`)
-Contains all React view components, layout templates, utility functions, and API wrappers used by Next.js.
+Contains React components, layout templates, utility functions, and API wrappers.
 
 **`frontend/src/app/`**
-Next.js App Router root defining the nested directory and route structure.
-- **`frontend/src/app/favicon.ico`:** The default favicon for the web application.
-- **`frontend/src/app/globals.css`:** The master, global CSS stylesheet. It injects Tailwind CSS utility layers, configures custom webkit scrollbars, and sets extensive dark/light mode OKLCH CSS variables to establish the premium platform aesthetic.
-- **`frontend/src/app/layout.js`:** The root layout component enveloping the entire HTML structure. It loads Google Fonts (Geist) and globally mounts components like the `CustomCursor`.
-- **`frontend/src/app/page.js`:** The Global Public Directory index path (`/`). This landing page retrieves all active public events and showcases an interactive `EncryptedText` banner positioned over an `AmbientAurora` background.
-
-**`frontend/src/app/ledger/`**
-- **`frontend/src/app/ledger/page.js`:** A dedicated administrative or analytical page designed for viewing global ledger data, including active events and overarching guest metrics.
-
-**`frontend/src/app/test-cursor/`**
-- **`frontend/src/app/test-cursor/page.js`:** A developer sandbox testing page configured specifically for experimenting with and visually debugging custom GPU-accelerated cursor animations.
+Next.js App Router root defining nested directory routing.
+- **`frontend/src/app/favicon.ico`:** Default favicon.
+- **`frontend/src/app/globals.css`:** Master CSS stylesheet injecting Tailwind utility layers and establishing the dark-mode aesthetic.
+- **`frontend/src/app/layout.js`:** Root layout component enveloping the entire HTML structure, mounting CustomCursor.
+- **`frontend/src/app/page.js`:** Global Public Directory index path showcasing public events.
+- **`frontend/src/app/ledger/page.js`:** Administrative page designed for viewing global ledger data and guest metrics.
+- **`frontend/src/app/test-cursor/page.js`:** Developer sandbox testing page for GPU-accelerated cursor animations.
 
 **`frontend/src/app/[eventSlug]/`**
-Dynamic route grouping serving as an isolated Tenant/Node context for individual events.
-- **`frontend/src/app/[eventSlug]/page.js`:** The public-facing Event Hub homepage detailing context for a specific event node (`/[eventSlug]`).
-- **`frontend/src/app/[eventSlug]/register/page.js`:** The guest onboarding page. Houses the `GuestIntakeForm` for collecting user credentials (`/[eventSlug]/register`).
+Dynamic route grouping serving as an isolated Tenant context.
+- **`frontend/src/app/[eventSlug]/layout.js`:** Layout wrapper managing cinematic hero engine, background slides, textures, and applying tenant theme config variables.
+- **`frontend/src/app/[eventSlug]/page.js`:** Public-facing Event Hub homepage detailing context for a specific event node.
+- **`frontend/src/app/[eventSlug]/register/page.js`:** Guest onboarding page to collect user credentials.
 
 **`frontend/src/app/[eventSlug]/portal/`**
 Gated access area for approved attendees post-registration.
-- **`frontend/src/app/[eventSlug]/portal/page.js`:** The Portal login lobby screen where returning guests input their access codes to verify entry permissions (`/[eventSlug]/portal`).
-- **`frontend/src/app/[eventSlug]/portal/dashboard/page.js`:** The interior interactive dashboard of an event portal. Wraps child components inside the `AbyssProvider` to ensure real-time websocket connectivity for the `GlobalFeed` and `GuestDirectory`.
+- **`frontend/src/app/[eventSlug]/portal/page.js`:** Portal login lobby screen for returning guests to verify entry via access codes.
+- **`frontend/src/app/[eventSlug]/portal/dashboard/page.js`:** Interior interactive dashboard of an event portal, initialized with AbyssProvider for real-time mesh features.
 
 **`frontend/src/app/admin/`**
-The overarching Control Plane dashboard interfaces.
-- **`frontend/src/app/admin/page.js`:** The main administrative dashboard overview tailored for platform managers, listing deployed events and globally synced metrics.
-- **`frontend/src/app/admin/login/page.js`:** The secure authentication gateway page demanding admin vault credentials before allowing Control Plane access.
+Overarching Control Plane dashboard interfaces.
+- **`frontend/src/app/admin/page.js`:** Main administrative dashboard overview listing deployed events and global metrics.
+- **`frontend/src/app/admin/login/page.js`:** Secure authentication gateway page demanding admin credentials.
 
 **`frontend/src/app/admin/events/`**
 Control Plane sub-routes for event modification.
-- **`frontend/src/app/admin/events/new/page.js`:** Administrative form interface utilized to configure and deploy a brand new Event node into the system.
-- **`frontend/src/app/admin/events/[eventSlug]/edit/page.js`:** Administrative form interface enabling the editing or teardown of an existing deployed Event node.
+- **`frontend/src/app/admin/events/new/page.js`:** Admin form interface to configure and deploy a brand new Event node.
+- **`frontend/src/app/admin/events/[eventSlug]/edit/page.js`:** Admin form interface to edit or teardown an existing deployed Event.
 
 **`frontend/src/app/admin/[eventSlug]/`**
-- **`frontend/src/app/admin/[eventSlug]/page.js`:** An admin-specific detailed ledger view of an individual Node's metrics, enabling managers to oversee attendees and internal node states.
+- **`frontend/src/app/admin/[eventSlug]/page.js`:** Admin-specific detailed ledger view of an individual Node's metrics.
 
 **`frontend/src/components/`**
-Reusable, encapsulated React component blocks.
-- **`frontend/src/components/AbyssProvider.jsx`:** A Global React Context component linking the `socket.io-client` with the backend Abyss engine to broadcast presence and sync real-time application states.
-- **`frontend/src/components/GuestIntakeForm.jsx`:** The client-side, interactive form module securely collecting new guest registrations and transmitting the payloads via API.
+Reusable React component blocks.
+- **`frontend/src/components/AbyssProvider.jsx`:** Global React Context linking socket.io-client with the backend Abyss engine for real-time presence broadcast.
+- **`frontend/src/components/GuestIntakeForm.jsx`:** Client-side form securely collecting new guest registrations.
 
 **`frontend/src/components/portal/`**
-Complex components rendered exclusively inside the gated portal environment.
-- **`frontend/src/components/portal/GlobalFeed.jsx`:** A real-time chat timeline or feed component pulling live echos (messages) and broadcasting outgoing ones over the Abyss network.
-- **`frontend/src/components/portal/GuestDirectory.jsx`:** A real-time, interactive user list directory allowing attendees to discover others, view online presence, and initiate direct network messaging within a specific mesh node.
+Rendered exclusively inside the gated portal environment.
+- **`frontend/src/components/portal/GlobalFeed.jsx`:** Real-time chat timeline pulling live echos and broadcasting outgoing ones over the Abyss network.
+- **`frontend/src/components/portal/GuestDirectory.jsx`:** Real-time interactive user list directory allowing discovery and direct messaging.
 
 **`frontend/src/components/ui/`**
-Low-level, atomic UI components engineered for high style and often heavily relying on Framer Motion GPU transitions.
-- **`frontend/src/components/ui/ambient-aurora.jsx`:** A fully hardware-accelerated, zero-blur dynamic radial gradient backdrop graphic ensuring a 60fps cinematic background aesthetic without straining system resources.
-- **`frontend/src/components/ui/custom-cursor.jsx`:** Overrides the native OS cursor with an interactive, animated alternative. Tracks raw mouse coordinates and applies linear interpolation (LERP) liquid ring trailing effects.
-- **`frontend/src/components/ui/encrypted-text.jsx`:** A styled text component that delivers a visual scrambling "decoding" effect via rapid interval-based character swapping.
-- **`frontend/src/components/ui/interactive-aura.jsx`:** A lobotomized, neutral placeholder component retained for strict architectural backwards-compatibility but designed to return null to free up GPU rendering cycles.
-- **`frontend/src/components/ui/luma-dropdown.jsx`:** A deeply styled, Framer Motion-animated, interactive generic dropdown menu equipped with smart directional (up/down) rendering anchors.
+Low-level, atomic UI components engineered for high style and Framer Motion transitions.
+- **`frontend/src/components/ui/ambient-aurora.jsx`:** Hardware-accelerated, zero-blur dynamic radial gradient backdrop.
+- **`frontend/src/components/ui/custom-cursor.jsx`:** Animated alternative cursor with linear interpolation liquid ring trailing effects.
+- **`frontend/src/components/ui/encrypted-text.jsx`:** Styled text component with visual scrambling "decoding" effect.
+- **`frontend/src/components/ui/interactive-aura.jsx`:** Placeholder architectural component returning null to free GPU cycles.
+- **`frontend/src/components/ui/luma-dropdown.jsx`:** Framer Motion-animated generic dropdown menu.
 
 **`frontend/src/lib/`**
-Generic, framework-agnostic helper functions specific to the frontend environment.
-- **`frontend/src/lib/utils.js`:** Common shared utility functions, primarily exporting a customized `cn` function utilized to dynamically merge Tailwind CSS class strings avoiding syntax conflicts.
+Generic framework-agnostic helper functions.
+- **`frontend/src/lib/utils.js`:** Shared functions, notably a customized `cn` function for dynamic Tailwind CSS class merging.
 
 **`frontend/src/proxy.js`**
-Vercel Edge Middleware. Dynamically intercepts requests navigating to custom whitelabel domains, resolves them internally to backend Tenant Nodes/Events, intelligently injects theme data inside request headers, and purposely bypasses static local file paths to optimize GPU/Network performance.
+Vercel Edge Middleware. Dynamically intercepts requests to custom whitelabel domains, resolves them internally to backend Tenant Nodes, injects theme data, and optimizes routing paths.
 
 **`frontend/src/services/`**
 Client-side network API wrapper modules.
-- **`frontend/src/services/api.js`:** A centralized `fetch` function wrapper exposing specific semantic functions (e.g. `registerGuest`, `fetchPublicEvents`) orchestrating all network communication directly back to backend REST endpoints. Robustly sanitizes base URLs and parses error payloads.
+- **`frontend/src/services/api.js`:** Centralized fetch function wrapper orchestrating network communication back to backend REST endpoints.
 
-update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and in the end of the file copy this prompt
+## Database Structure
+
+
+================================================================
+   [Architecture] DATABASE SCHEMA MAPPER Engaged
+================================================================
+
+
+ TABLE: ADMINS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+email                     | varchar(255)              | NO         | NULL
+password_hash             | varchar(255)              | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+role                      | varchar(50)               | YES        | 'superadmin'::character varying
+organization_id           | integer                   | YES        | NULL
+------------------------------------------------------------------------------------------
+
+ TABLE: DIRECT_MESSAGES
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+event_id                  | integer                   | YES        | NULL
+sender_id                 | uuid                      | YES        | NULL
+receiver_id               | uuid                      | YES        | NULL
+content                   | text                      | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: EVENT_IMAGES
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+event_id                  | integer                   | NO         | NULL
+image_url                 | text                      | NO         | NULL
+display_order             | integer                   | YES        | 0
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: EVENT_REGISTRATIONS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+guest_id                  | uuid                      | YES        | NULL
+event_id                  | integer                   | YES        | NULL
+access_code               | varchar(255)              | NO         | NULL
+id_number                 | varchar(100)              | NO         | NULL
+id_document_url           | text                      | NO         | NULL
+dietary_restrictions      | text                      | YES        | NULL
+current_state             | integer                   | YES        | 0
+error_log                 | text                      | YES        | NULL
+registered_at             | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: EVENT_SCHEDULES
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+event_id                  | integer                   | YES        | NULL
+title                     | varchar(255)              | NO         | NULL
+description               | text                      | YES        | NULL
+speaker_name              | varchar(255)              | YES        | NULL
+location                  | varchar(255)              | YES        | NULL
+start_time                | timestamp with time zone  | NO         | NULL
+end_time                  | timestamp with time zone  | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+updated_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: EVENT_STAFF_ASSIGNMENTS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+admin_id                  | uuid                      | NO         | NULL
+event_id                  | integer                   | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: EVENTS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | integer                   | NO         | nextval('events_id_seq'::regclass)
+slug                      | varchar(255)              | NO         | NULL
+name                      | varchar(255)              | NO         | NULL
+created_at                | timestamp without time zone | YES        | CURRENT_TIMESTAMP
+is_public                 | boolean                   | YES        | true
+description               | text                      | YES        | NULL
+location                  | varchar(255)              | YES        | NULL
+start_date                | timestamp with time zone  | YES        | NULL
+end_date                  | timestamp with time zone  | YES        | NULL
+mesh_dissolved            | boolean                   | YES        | false
+custom_domain             | varchar(255)              | YES        | NULL
+theme_config              | jsonb                     | YES        | '{}'::jsonb
+organization_id           | integer                   | YES        | NULL
+------------------------------------------------------------------------------------------
+
+ TABLE: FINALIZED_ECHOS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+event_id                  | integer                   | NO         | NULL
+initiator_id              | uuid                      | NO         | NULL
+receiver_id               | uuid                      | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: GLOBAL_ECHOS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+event_id                  | integer                   | YES        | NULL
+guest_id                  | uuid                      | YES        | NULL
+content                   | varchar(500)              | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: GUESTS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | uuid                      | NO         | uuid_generate_v4()
+full_name                 | varchar(255)              | NO         | NULL
+email                     | varchar(255)              | NO         | NULL
+phone                     | varchar(50)               | YES        | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+updated_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+ TABLE: ORGANIZATIONS
+------------------------------------------------------------------------------------------
+COLUMN NAME               | DATA TYPE                 | NULLABLE   | DEFAULT
+------------------------------------------------------------------------------------------
+id                        | integer                   | NO         | nextval('organizations_id_seq'::regclass)
+name                      | varchar(255)              | NO         | NULL
+created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
+------------------------------------------------------------------------------------------
+
+✅ System Architecture Mapping Complete.
+
+
+update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and database structure  and in the end of the file copy this prompt and do not copy anything beyond this line.
+current database
