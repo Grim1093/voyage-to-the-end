@@ -143,15 +143,6 @@ export default function GlobalPlatformHub() {
         { pos: 'top-0 right-1/4', bg: 'bg-indigo-500/10', duration: '9s', holo: 'via-indigo-400/20', shadow: 'hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]' }
     ];
 
-    const ledgerColors = [
-        { border: 'hover:border-l-indigo-500', sweep: 'from-indigo-500/[0.05]', text: 'group-hover:text-indigo-400' },
-        { border: 'hover:border-l-violet-500', sweep: 'from-violet-500/[0.05]', text: 'group-hover:text-violet-400' },
-        { border: 'hover:border-l-fuchsia-500', sweep: 'from-fuchsia-500/[0.05]', text: 'group-hover:text-fuchsia-400' },
-        { border: 'hover:border-l-blue-500', sweep: 'from-blue-500/[0.05]', text: 'group-hover:text-blue-400' },
-        { border: 'hover:border-l-emerald-500', sweep: 'from-emerald-500/[0.05]', text: 'group-hover:text-emerald-400' },
-        { border: 'hover:border-l-cyan-500', sweep: 'from-cyan-500/[0.05]', text: 'group-hover:text-cyan-400' },
-    ];
-
     const staggerContainer = {
         hidden: { opacity: 0 },
         show: { opacity: 1, transition: { staggerChildren: 0.1 } }
@@ -328,77 +319,17 @@ export default function GlobalPlatformHub() {
                                     </motion.div>
                                 )}
 
-                                {/* 2. Master Ledger: Tactical Data Bars with Slideshow Integration */}
+                                {/* 2. Master Ledger CTA Button */}
                                 {ledgerNodes.length > 0 && (
-                                    <div className="w-full flex flex-col relative z-20">
-                                        <motion.div layout className="mb-6 px-2 flex items-center justify-between">
-                                            <h2 className="text-[10px] font-bold text-zinc-500 tracking-[0.2em] uppercase">
-                                                Extended Ledger
-                                            </h2>
-                                            <div className="h-[1px] flex-grow bg-white/[0.05] ml-6"></div>
-                                        </motion.div>
-                                        
-                                        <motion.div layout className="flex flex-col gap-3">
-                                            <AnimatePresence mode="popLayout">
-                                                {ledgerNodes.map((event, index) => {
-                                                    const colorConfig = ledgerColors[index % ledgerColors.length];
-                                                    
-                                                    const hasImages = event.images && event.images.length > 0;
-                                                    const rowBgClass = hasImages ? 'bg-[#0a0a0c]' : 'bg-white/[0.01] hover:bg-white/[0.03]';
-
-                                                    return (
-                                                        <motion.div 
-                                                            key={event.slug}
-                                                            layout
-                                                            initial={{ opacity: 0, x: -20 }}
-                                                            animate={{ opacity: 1, x: 0 }}
-                                                            exit={{ opacity: 0, x: 20 }}
-                                                            transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                                                        >
-                                                            <Link 
-                                                                href={`/${event.slug}`}
-                                                                className={`group relative overflow-hidden flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 border border-white/[0.05] rounded-[24px] border-l-[3px] border-l-transparent ${colorConfig.border} transition-all duration-300 ease-out hover:shadow-[0_0_30px_rgba(255,255,255,0.02)] ${rowBgClass}`}
-                                                            >
-                                                                {hasImages && <EventSlideshow images={event.images} />}
-
-                                                                {!hasImages && (
-                                                                    <div className={`absolute inset-0 bg-gradient-to-r ${colorConfig.sweep} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 ease-out pointer-events-none`} />
-                                                                )}
-                                                                
-                                                                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 flex-grow relative z-10">
-                                                                    <div className="w-32 shrink-0">
-                                                                        <span className={`text-[10px] font-bold uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border backdrop-blur-md ${hasImages ? 'bg-white/[0.04] border-white/[0.05] text-zinc-300' : 'bg-white/[0.02] border-white/[0.05] text-zinc-500'}`}>
-                                                                            {formatLedgerDate(event.start_date)}
-                                                                        </span>
-                                                                    </div>
-                                                                    
-                                                                    <div className="flex flex-col gap-1.5 flex-grow">
-                                                                        <span className={`text-lg font-medium tracking-wide transition-colors ${hasImages ? 'text-white drop-shadow-md' : 'text-zinc-200 group-hover:text-white'}`}>
-                                                                            {event.title}
-                                                                        </span>
-                                                                        {event.location && (
-                                                                            <div className="flex items-center gap-1.5">
-                                                                                <svg className={`w-3.5 h-3.5 ${hasImages ? 'text-zinc-400' : 'text-zinc-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                                                <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${hasImages ? 'text-zinc-300 drop-shadow-sm' : 'text-zinc-500'}`}>
-                                                                                    {event.location}
-                                                                                </span>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="mt-4 sm:mt-0 flex items-center gap-4 sm:gap-6 relative z-10 shrink-0">
-                                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 shadow-inner ${hasImages ? 'bg-white/[0.08] group-hover:bg-white/[0.2] border border-white/[0.15] text-white' : `bg-white/[0.05] group-hover:bg-white/[0.15] border border-white/[0.1] ${colorConfig.text}`}`}>
-                                                                        <svg className="w-4 h-4 -rotate-45 group-hover:rotate-0 transition-transform duration-300 ease-out" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-                                                                    </div>
-                                                                </div>
-                                                            </Link>
-                                                        </motion.div>
-                                                    );
-                                                })}
-                                            </AnimatePresence>
-                                        </motion.div>
-                                    </div>
+                                    <motion.div layout className="w-full flex justify-center mt-8 relative z-20">
+                                        <Link 
+                                            href="/ledger" 
+                                            className="group relative flex items-center gap-3 px-8 py-4 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.1] hover:border-indigo-500/50 rounded-full text-xs font-bold tracking-[0.2em] uppercase text-zinc-300 hover:text-white transition-all duration-300 backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(99,102,241,0.2)]"
+                                        >
+                                            <span>Access Extended Ledger</span>
+                                            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                        </Link>
+                                    </motion.div>
                                 )}
                                 
                             </motion.div>

@@ -47,6 +47,10 @@ export default function MasterDashboard() {
 
     // --- DESTRUCTIVE ACTION STATE ---
     const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, title: '', message: '', action: null, isLoading: false });
+    
+    // --- UI EXPANSION STATE ---
+    // [Architecture] Track which organization groups are expanded in the UI
+    const [expandedOrgs, setExpandedOrgs] = useState({});
 
     const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
 
@@ -155,6 +159,10 @@ export default function MasterDashboard() {
         try {
             const data = await fetchAllAdminEvents();
             setEvents(data);
+            
+            // Auto-expand the Unassigned group by default
+            setExpandedOrgs(prev => ({...prev, 'unassigned': true}));
+            
             setStatus('success');
         } catch (error) {
             if (error.message.toLowerCase().includes('401') || error.message.toLowerCase().includes('session')) {
@@ -322,6 +330,13 @@ export default function MasterDashboard() {
         setIsAssignModalOpen(true);
     };
 
+    const toggleOrgExpansion = (orgId) => {
+        setExpandedOrgs(prev => ({
+            ...prev,
+            [orgId]: !prev[orgId]
+        }));
+    };
+
     const renderStateBadge = (state) => {
         switch(state) {
             case 0: return <span className="flex items-center gap-1.5 text-zinc-500 text-[10px] font-bold uppercase tracking-widest"><span className="w-1 h-1 rounded-full bg-zinc-600"></span> Invited</span>;
@@ -344,53 +359,176 @@ export default function MasterDashboard() {
     const activeEvents = events.filter(e => !e.is_expired);
     const previousEvents = events.filter(e => e.is_expired);
 
+    // [Architecture] Grouping Engine for Superadmin View
+    const getGroupedEvents = (eventList) => {
+        if (adminRole !== 'superadmin') return { unassigned: eventList }; // Tenant admins/staff just get a flat list
+
+        const groups = { unassigned: [] };
+        eventList.forEach(event => {
+            if (event.organization_id) {
+                if (!groups[event.organization_id]) {
+                    groups[event.organization_id] = {
+                        name: event.organization_name || 'Unknown Agency',
+                        events: []
+                    };
+                }
+                groups[event.organization_id].events.push(event);
+            } else {
+                groups.unassigned.push(event);
+            }
+        });
+        return groups;
+    };
+
     const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
     const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
     const renderEventCards = (eventList) => {
         if (eventList.length === 0) {
             return (
-                <motion.div variants={itemVariant} className="col-span-full py-32 flex flex-col items-center justify-center border border-dashed border-white/[0.05] rounded-[32px] bg-white/[0.01]">
-                    <span className="text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase">No Data Permutations Found</span>
+                <motion.div variants={itemVariant} className="col-span-full py-16 flex flex-col items-center justify-center border border-dashed border-white/[0.05] rounded-[32px] bg-white/[0.01]">
+                    <span className="text-zinc-600 text-[10px] font-mono tracking-[0.2em] uppercase">No Nodes Found In Sector</span>
                 </motion.div>
             );
         }
         
-        return eventList.map((event) => (
-            <motion.div key={event.slug} variants={itemVariant}>
-                <div className={`relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] group ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
-                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
-                    <div className="relative z-10 flex justify-between items-start mb-8">
-                        <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08] text-sm font-light text-zinc-300 shadow-inner">
-                            {event.slug.charAt(0).toUpperCase()}
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                {eventList.map((event) => (
+                    <motion.div key={event.slug} variants={itemVariant}>
+                        <div className={`relative overflow-hidden bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 flex flex-col transition-all duration-500 ease-out hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(34,211,238,0.1)] group h-full ${event.is_expired ? 'opacity-60 grayscale-[80%]' : ''}`}>
+                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
+                            <div className="relative z-10 flex justify-between items-start mb-8">
+                                <div className="w-12 h-12 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08] text-sm font-light text-zinc-300 shadow-inner">
+                                    {event.slug.charAt(0).toUpperCase()}
+                                </div>
+                                <span className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
+                                    {event.is_expired ? 'Archived' : event.is_public ? 'Public' : 'Private'}
+                                </span>
+                            </div>
+                            
+                            <div className="relative z-10 flex-grow">
+                                <h3 className="text-xl font-medium text-white mb-2 tracking-tight truncate">{event.title}</h3>
+                                <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-cyan-400 transition-colors flex items-center gap-2 w-fit group/link">
+                                    /{event.slug}
+                                    <svg className="w-3 h-3 opacity-0 -translate-x-2 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                </a>
+                            </div>
+                            
+                            <div className="relative z-10 mt-6 flex gap-3">
+                                <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white text-zinc-300 hover:text-black py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all shadow-inner hover:shadow-none">
+                                    {event.is_expired ? 'View Ledger' : 'Manage Node'}
+                                </Link>
+                                {!event.is_expired && adminRole !== 'staff' && (
+                                    <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all shrink-0">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    </Link>
+                                )}
+                            </div>
                         </div>
-                        <span className={`flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] ${event.is_expired ? 'text-rose-500/80' : event.is_public ? 'text-zinc-400' : 'text-indigo-400/80'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${event.is_expired ? 'bg-rose-500/80' : event.is_public ? 'bg-zinc-500' : 'bg-indigo-500'}`}></span>
-                            {event.is_expired ? 'Archived' : event.is_public ? 'Public' : 'Private'}
-                        </span>
+                    </motion.div>
+                ))}
+            </div>
+        );
+    };
+
+    // [Architecture] Render Grouped Engine UI
+    const renderGroupedViews = (eventList) => {
+        if (adminRole !== 'superadmin') {
+            return (
+                <motion.div variants={staggerContainer} initial="hidden" animate="show" className="w-full">
+                    {renderEventCards(eventList)}
+                </motion.div>
+            );
+        }
+
+        const grouped = getGroupedEvents(eventList);
+        const orgIds = Object.keys(grouped).filter(key => key !== 'unassigned');
+
+        return (
+            <div className="space-y-8 w-full">
+                {/* Render Defined Organizations */}
+                {orgIds.map(orgId => {
+                    const group = grouped[orgId];
+                    const isExpanded = expandedOrgs[orgId];
+                    return (
+                        <div key={orgId} className="bg-white/[0.01] border border-white/[0.05] rounded-[32px] overflow-hidden transition-all duration-300">
+                            <button 
+                                onClick={() => toggleOrgExpansion(orgId)}
+                                className="w-full px-8 py-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-xs">
+                                        {group.name.substring(0, 2).toUpperCase()}
+                                    </div>
+                                    <div className="text-left">
+                                        <h3 className="text-lg font-medium text-white tracking-tight">{group.name}</h3>
+                                        <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{group.events.length} Nodes Allocated</p>
+                                    </div>
+                                </div>
+                                <div className={`text-zinc-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </div>
+                            </button>
+                            
+                            <AnimatePresence>
+                                {isExpanded && (
+                                    <motion.div 
+                                        initial={{ height: 0, opacity: 0 }} 
+                                        animate={{ height: 'auto', opacity: 1 }} 
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="border-t border-white/[0.02]"
+                                    >
+                                        <div className="p-8">
+                                            {renderEventCards(group.events)}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    );
+                })}
+
+                {/* Render Unassigned / Global Sandbox */}
+                {grouped.unassigned.length > 0 && (
+                    <div className="bg-white/[0.01] border border-white/[0.05] rounded-[32px] overflow-hidden transition-all duration-300">
+                        <button 
+                            onClick={() => toggleOrgExpansion('unassigned')}
+                            className="w-full px-8 py-6 flex items-center justify-between hover:bg-white/[0.02] transition-colors"
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 font-bold text-xs">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                                </div>
+                                <div className="text-left">
+                                    <h3 className="text-lg font-medium text-white tracking-tight">Global / Unassigned Nodes</h3>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">{grouped.unassigned.length} Sandbox(es) Detached</p>
+                                </div>
+                            </div>
+                            <div className={`text-zinc-500 transition-transform duration-300 ${expandedOrgs['unassigned'] ? 'rotate-180' : ''}`}>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                        </button>
+                        
+                        <AnimatePresence>
+                            {expandedOrgs['unassigned'] && (
+                                <motion.div 
+                                    initial={{ height: 0, opacity: 0 }} 
+                                    animate={{ height: 'auto', opacity: 1 }} 
+                                    exit={{ height: 0, opacity: 0 }}
+                                    className="border-t border-white/[0.02]"
+                                >
+                                    <div className="p-8">
+                                        {renderEventCards(grouped.unassigned)}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    
-                    <div className="relative z-10">
-                        <h3 className="text-xl font-medium text-white mb-2 tracking-tight truncate">{event.title}</h3>
-                        <a href={`/${event.slug}`} target="_blank" rel="noopener noreferrer" className="text-zinc-500 text-[11px] font-mono mb-10 hover:text-cyan-400 transition-colors flex items-center gap-2 w-fit group/link">
-                            /{event.slug}
-                            <svg className="w-3 h-3 opacity-0 -translate-x-2 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                        </a>
-                    </div>
-                    
-                    <div className="relative z-10 mt-auto flex gap-3">
-                        <Link href={`/admin/${event.slug}`} className="flex-1 bg-white/[0.03] hover:bg-white text-zinc-300 hover:text-black py-3 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-center transition-all shadow-inner hover:shadow-none">
-                            {event.is_expired ? 'View Ledger' : 'Manage Node'}
-                        </Link>
-                        {!event.is_expired && adminRole !== 'staff' && (
-                            <Link href={`/admin/events/${event.slug}/edit`} className="w-12 h-12 flex items-center justify-center bg-white/[0.03] hover:bg-white border border-transparent hover:border-white text-zinc-400 hover:text-black rounded-full transition-all">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-            </motion.div>
-        ));
+                )}
+            </div>
+        );
     };
 
     const roleOptions = [
@@ -471,12 +609,12 @@ export default function MasterDashboard() {
                             <svg className="animate-spin h-6 w-6 text-zinc-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         </motion.div>
                     ) : activeTab === 'active_events' ? (
-                        <motion.div key="active_events" variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {renderEventCards(activeEvents)}
+                        <motion.div key="active_events" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="w-full">
+                            {renderGroupedViews(activeEvents)}
                         </motion.div>
                     ) : activeTab === 'previous_events' ? (
-                        <motion.div key="previous_events" variants={staggerContainer} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {renderEventCards(previousEvents)}
+                        <motion.div key="previous_events" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="w-full">
+                            {renderGroupedViews(previousEvents)}
                         </motion.div>
                     ) : activeTab === 'agencies' && adminRole === 'superadmin' ? (
                         <motion.div key="agencies" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 24 }} className="bg-white/[0.01] backdrop-blur-xl rounded-[32px] border border-white/[0.05] overflow-hidden shadow-2xl">
