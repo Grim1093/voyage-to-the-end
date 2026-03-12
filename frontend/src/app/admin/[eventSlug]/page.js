@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link'; 
 import { motion, AnimatePresence } from 'framer-motion';
-// [Architecture] Added fetchEventDetails to check the Archive Lock
 import { getAllGuests, updateGuestState, fetchGuestDetails, fetchEventDetails } from '../../../services/api';
 import { LumaDropdown } from '@/components/ui/luma-dropdown';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
@@ -29,15 +28,17 @@ export default function GuestLedgerDashboard() {
     const [totalGuests, setTotalGuests] = useState(0);
     const [limit, setLimit] = useState(10);
 
-    // [Architecture] State to track if the node is in the Immutable Archive
+    // [Architecture] State to track node archives and partial theming
     const [isArchived, setIsArchived] = useState(false);
+    const [themeConfig, setThemeConfig] = useState({});
 
     const fetchLedger = useCallback(async (pageToFetch = currentPage, limitToFetch = limit) => {
         setStatus('loading');
         try {
-            // First, fetch event details to check the Archive Lock
+            // First, fetch event details to check the Archive Lock & extract partial theme
             const eventData = await fetchEventDetails(eventSlug);
             setIsArchived(eventData.is_expired);
+            setThemeConfig(eventData.theme_config || {});
 
             const result = await getAllGuests(eventSlug, pageToFetch, limitToFetch); 
             setGuests(result.data);
@@ -52,7 +53,6 @@ export default function GuestLedgerDashboard() {
 
             const msg = error.message.toLowerCase();
             if (msg.includes('forbidden') || msg.includes('unauthorized') || msg.includes('session') || msg.includes('401') || msg.includes('403')) {
-                // [Architecture] Purge the JWT on unauthorized access or session bounce
                 localStorage.removeItem('adminToken');
                 router.push('/admin/login');
             }
@@ -60,7 +60,6 @@ export default function GuestLedgerDashboard() {
     }, [currentPage, limit, router, eventSlug, context]);
 
     useEffect(() => {
-        // [Architecture] Upgraded Gatekeeper for Cryptographic JWT Validation
         const validateGatekeeper = () => {
             const token = localStorage.getItem('adminToken');
             if (!token) {
@@ -77,7 +76,6 @@ export default function GuestLedgerDashboard() {
     }, [fetchLedger, router, context]);
 
     const handleStateChange = async (guestId, newState) => {
-        // Double check against tampering
         if (isArchived) {
             alert("This node is permanently archived. State mutations are locked.");
             return;
@@ -104,7 +102,7 @@ export default function GuestLedgerDashboard() {
     };
 
     const handleLockVault = () => {
-        localStorage.removeItem('adminToken'); // [Architecture] Purge JWT on manual lock
+        localStorage.removeItem('adminToken'); 
         router.push('/admin/login');
     };
 
@@ -138,17 +136,18 @@ export default function GuestLedgerDashboard() {
         { label: '50 Nodes', value: 50 }
     ];
 
-    const staggerContainer = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
-    const itemVariant = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+    const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+    const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
+
+    // [Architecture] Partial Theming Injection
+    // We intentionally ignore background, texture, and radius to maintain the clean Admin UI.
+    const cssVariables = {
+        '--tenant-primary': themeConfig.primary || '#06b6d4', // Defaults to Cyan
+        '--tenant-accent': themeConfig.accent || '#3b82f6',
     };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-cyan-500/30 overflow-hidden">
+        <main style={cssVariables} className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-[var(--tenant-primary)]/30 overflow-hidden">
             
             <AmbientAurora />
             <InteractiveAura />
@@ -161,7 +160,8 @@ export default function GuestLedgerDashboard() {
                     <div>
                         <h1 className="text-xs font-bold text-white tracking-[0.2em] uppercase">Ledger Explorer</h1>
                         <div className="flex items-center gap-2">
-                            <p className="text-[9px] text-cyan-400 font-mono tracking-widest uppercase">Target: /{eventSlug}</p>
+                            {/* [Architecture] Target text utilizes the Event Primary Color */}
+                            <p className="text-[9px] text-[var(--tenant-primary)] font-mono tracking-widest uppercase font-bold drop-shadow-sm">Target: /{eventSlug}</p>
                             {isArchived && (
                                 <span className="px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase bg-rose-500/10 text-rose-500 border border-rose-500/20">ARCHIVED</span>
                             )}
@@ -195,7 +195,7 @@ export default function GuestLedgerDashboard() {
                             exit={{ opacity: 0 }}
                             className="flex flex-col items-center justify-center py-32"
                         >
-                            <svg className="animate-spin h-5 w-5 text-zinc-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg className="animate-spin h-5 w-5 text-[var(--tenant-primary)] opacity-70" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -266,7 +266,7 @@ export default function GuestLedgerDashboard() {
                                 {totalGuests > 0 && (
                                     <div className="px-8 py-6 flex items-center justify-between bg-white/[0.01] border-t border-white/[0.03]">
                                         <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">
-                                            Displaying <span className="text-zinc-400">{((currentPage - 1) * limit) + 1} - {Math.min(currentPage * limit, totalGuests)}</span> of {totalGuests} entries
+                                            Displaying <span className="text-[var(--tenant-primary)]">{((currentPage - 1) * limit) + 1} - {Math.min(currentPage * limit, totalGuests)}</span> of {totalGuests} entries
                                         </div>
                                         <div className="flex items-center gap-6 relative z-50">
                                             <div className="flex items-center gap-3 w-40">
@@ -310,13 +310,17 @@ export default function GuestLedgerDashboard() {
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                             className="bg-white/[0.02] border border-white/[0.08] rounded-[40px] shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-xl overflow-hidden relative"
                         >
-                            <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-cyan-400/5 to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" />
+                            {/* [Architecture] The Modal Holographic Sweep now uses the Event's Primary Color */}
+                            <div 
+                                className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent -skew-x-[30deg] animate-[modalSweep_2s_ease-out_forwards] pointer-events-none z-0" 
+                                style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-primary) 5%, transparent), transparent)' }}
+                            />
                             
                             <div className="p-10 relative z-10">
                                 <div className="flex justify-between items-start mb-8">
                                     <div>
                                         <h2 className="text-2xl font-medium text-white tracking-tight">{selectedGuest.full_name}</h2>
-                                        <p className="text-[10px] text-zinc-500 font-mono mt-1 uppercase tracking-widest">Entry UID: <span className="text-zinc-400">{selectedGuest.id}</span></p>
+                                        <p className="text-[10px] text-zinc-500 font-mono mt-1 uppercase tracking-widest">Entry UID: <span className="text-[var(--tenant-primary)] drop-shadow-sm">{selectedGuest.id}</span></p>
                                     </div>
                                     <button onClick={() => setSelectedGuest(null)} className="w-10 h-10 flex items-center justify-center bg-white/[0.03] rounded-full text-zinc-500 hover:text-white border border-white/[0.05] transition-all hover:bg-rose-500/20 hover:border-rose-500/30 hover:text-rose-400">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
