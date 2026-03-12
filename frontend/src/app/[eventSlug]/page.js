@@ -1,7 +1,6 @@
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
@@ -12,39 +11,6 @@ const EncryptedText = dynamic(
     () => import('@/components/ui/encrypted-text').then((mod) => mod.EncryptedText),
     { ssr: false }
 );
-
-const HeroSlideshow = ({ images }) => {
-    const [currentIndex, setCurrentIndex] = useState(0);
-
-    useEffect(() => {
-        if (!images || images.length <= 1) return;
-        const timer = setInterval(() => setCurrentIndex((prev) => (prev + 1) % images.length), 5000);
-        return () => clearInterval(timer);
-    }, [images]);
-
-    if (!images || images.length === 0) return null;
-
-    return (
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-[var(--tenant-bg)]">
-            {images.map((src, index) => {
-                const isActive = currentIndex === index;
-                return (
-                    <motion.div
-                        key={src}
-                        initial={false} 
-                        animate={{ opacity: isActive ? 1 : 0, scale: isActive ? 1.05 : 1, zIndex: isActive ? 10 : 0 }}
-                        transition={{ opacity: { duration: 1.5, ease: "easeInOut" }, scale: { duration: 10, ease: "linear" } }}
-                        className="absolute inset-0 will-change-transform transform-gpu"
-                    >
-                        <Image src={src} alt="Event Atmosphere" fill priority={index === 0} sizes="100vw" className="object-cover object-center opacity-50" />
-                    </motion.div>
-                );
-            })}
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,var(--tenant-bg)_120%)] opacity-80 z-20 transform-gpu" />
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--tenant-bg)]/60 to-[var(--tenant-bg)] z-20 transform-gpu" />
-        </div>
-    );
-};
 
 export default function EventHub() {
     const params = useParams();
@@ -78,15 +44,36 @@ export default function EventHub() {
         if (end) return `Until ${new Date(end).toLocaleDateString('en-US', opts)}`;
     };
 
-    if (loading || error || !event) return null; 
+    if (loading) {
+        return (
+            <main className="flex flex-col items-center justify-center min-h-screen relative z-10 bg-transparent">
+                <svg className="animate-spin h-6 w-6 text-[var(--tenant-text)] opacity-50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </main>
+        );
+    }
+
+    if (error || !event) {
+        return (
+            <main className="flex flex-col items-center justify-center min-h-screen relative z-10 bg-transparent p-4">
+                <div className="bg-black/40 border border-white/[0.05] p-8 max-w-sm text-center backdrop-blur-xl shadow-2xl" style={{ borderRadius: 'var(--tenant-radius)' }}>
+                    <h1 className="text-lg font-bold text-[var(--tenant-text)] mb-2">Access Denied</h1>
+                    <p className="text-[var(--tenant-text)] opacity-60 text-xs mb-6">{error}</p>
+                    <Link href="/" className="inline-flex py-3 px-6 bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.1] text-[var(--tenant-text)] font-bold text-[10px] uppercase tracking-widest transition-all" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
+                        Return to Ledger
+                    </Link>
+                </div>
+            </main>
+        );
+    }
 
     const formattedDate = formatEventTime(event.start_date, event.end_date);
-    const hasImages = event.images && event.images.length > 0;
 
     if (event.is_expired) {
         return (
-            <main className="flex flex-col items-center justify-center p-4 relative overflow-hidden min-h-screen">
-                {hasImages && <HeroSlideshow images={event.images} />}
+            <main className="flex flex-col items-center justify-center p-4 relative overflow-hidden min-h-screen bg-transparent">
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-rose-500/[0.03] rounded-full filter blur-[150px] pointer-events-none z-0 transform-gpu"></div>
                 <div 
                     className="bg-black/60 border border-white/[0.05] p-12 max-w-md text-center backdrop-blur-2xl z-20 shadow-2xl relative"
@@ -112,8 +99,7 @@ export default function EventHub() {
     const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
     return (
-        <main className="flex flex-col items-center relative overflow-hidden min-h-screen">
-            {hasImages && <HeroSlideshow images={event.images} />}
+        <main className="flex flex-col items-center relative overflow-hidden min-h-screen bg-transparent">
 
             <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20 relative">
                 <div className="flex items-center gap-3">
