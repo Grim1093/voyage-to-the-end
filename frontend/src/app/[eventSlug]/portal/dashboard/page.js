@@ -4,11 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchGuestStatus, fetchEventSchedule } from '../../../../services/api'; 
-import { AmbientAurora } from '@/components/ui/ambient-aurora';
-import { InteractiveAura } from '@/components/ui/interactive-aura';
 import { AbyssProvider, useAbyss } from '@/components/AbyssProvider';
 import { GlobalFeed } from '@/components/portal/GlobalFeed';
-// [Architecture] Import the Guest Directory component for the Direct Mesh
 import { GuestDirectory } from '@/components/portal/GuestDirectory';
 
 function GuestDashboardInner() {
@@ -18,10 +15,9 @@ function GuestDashboardInner() {
     
     const router = useRouter();
     const [guest, setGuest] = useState(null);
-    const [scheduleNodes, setScheduleNodes] = useState([]); // ARCHITECT NOTE: Holds the temporal itinerary
+    const [scheduleNodes, setScheduleNodes] = useState([]);
     const [isLoadingSchedule, setIsLoadingSchedule] = useState(true);
     
-    // [Architecture] State-based routing extended to 3 tabs
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'feed' | 'directory'
     
     const { socket, isConnected } = useAbyss();
@@ -41,7 +37,6 @@ function GuestDashboardInner() {
             const parsedData = JSON.parse(sessionData);
             setGuest(parsedData); 
 
-            // 1. Sync Live Status
             const syncStatus = async () => {
                 try {
                     const liveState = await fetchGuestStatus(eventSlug, parsedData.id);
@@ -56,7 +51,6 @@ function GuestDashboardInner() {
             };
             syncStatus();
 
-            // 2. Fetch the Temporal Itinerary
             const loadSchedule = async () => {
                 try {
                     const data = await fetchEventSchedule(eventSlug);
@@ -106,9 +100,8 @@ function GuestDashboardInner() {
 
     if (!guest) {
         return (
-            <main className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center p-4 text-zinc-500 relative overflow-hidden">
-                <AmbientAurora />
-                <svg className="animate-spin h-6 w-6 mb-4 relative z-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-transparent relative overflow-hidden">
+                <svg className="animate-spin h-6 w-6 relative z-10 text-[var(--tenant-text)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -118,40 +111,32 @@ function GuestDashboardInner() {
 
     const renderStatusBadge = (state) => {
         switch(state) {
-            case 0: return <span className="px-3 py-1 bg-zinc-800 text-zinc-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-zinc-700 shadow-inner">Invited</span>;
-            case 1: return <span className="px-3 py-1 bg-amber-500/10 text-amber-500/80 rounded-full text-[10px] font-bold uppercase tracking-wider border border-amber-500/20 shadow-inner">Pending Review</span>;
-            case 2: return <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-full text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]">Verified Access</span>;
-            case -1: return <span className="px-3 py-1 bg-rose-500/10 text-rose-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-500/20 shadow-inner">Action Required</span>;
-            default: return <span className="px-3 py-1 bg-zinc-800 text-zinc-500 rounded-full text-[10px] font-bold uppercase tracking-wider border border-zinc-700 shadow-inner">Unknown</span>;
+            case 0: return <span className="px-3 py-1 bg-zinc-800/50 text-[var(--tenant-text)] opacity-60 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10 shadow-inner" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>Invited</span>;
+            case 1: return <span className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-inner" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-accent) 20%, transparent)', color: 'var(--tenant-accent)', border: '1px solid color-mix(in srgb, var(--tenant-accent) 40%, transparent)', borderRadius: 'var(--tenant-btn-radius)' }}>Pending Review</span>;
+            case 2: return <span className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider shadow-[0_0_15px_color-mix(in_srgb,var(--tenant-primary)_30%,transparent)]" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-primary) 20%, transparent)', color: 'var(--tenant-primary)', border: '1px solid color-mix(in srgb, var(--tenant-primary) 40%, transparent)', borderRadius: 'var(--tenant-btn-radius)' }}>Verified Access</span>;
+            case -1: return <span className="px-3 py-1 bg-rose-500/10 text-rose-400 rounded-full text-[10px] font-bold uppercase tracking-wider border border-rose-500/20 shadow-inner" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>Action Required</span>;
+            default: return <span className="px-3 py-1 bg-zinc-800/50 text-[var(--tenant-text)] opacity-60 rounded-full text-[10px] font-bold uppercase tracking-wider border border-white/10 shadow-inner" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>Unknown</span>;
         }
     };
 
-    const staggerContainer = {
-        hidden: { opacity: 0 },
-        show: { opacity: 1, transition: { staggerChildren: 0.1 } }
-    };
-
-    const itemVariant = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
-    };
+    const staggerContainer = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.1 } } };
+    const itemVariant = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } } };
 
     return (
-        <main className="min-h-screen bg-[#09090b] flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden">
-            <AmbientAurora />
-            <InteractiveAura />
+        <main className="min-h-screen bg-transparent flex flex-col items-center text-[var(--tenant-text)] relative selection:bg-[var(--tenant-primary)]/30 overflow-hidden">
 
             <header className="w-full max-w-6xl flex items-center justify-between px-6 py-5 z-20">
                 <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                    <div className="w-7 h-7 bg-[var(--tenant-text)] text-[var(--tenant-bg)] flex items-center justify-center font-bold text-[10px] tracking-tighter" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
                         NX
                     </div>
-                    <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase hidden sm:block">Nexus</span>
+                    <span className="font-semibold text-[var(--tenant-text)] opacity-90 tracking-[0.2em] text-xs uppercase hidden sm:block">Nexus</span>
                 </div>
                 
                 <button 
                     onClick={handleLogout}
-                    className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] border border-white/[0.05] px-4 py-2.5 rounded-full backdrop-blur-md hover:bg-white/[0.06]"
+                    className="flex items-center gap-2 text-[10px] font-bold tracking-[0.1em] uppercase text-[var(--tenant-text)] opacity-60 hover:opacity-100 transition-colors bg-white/[0.02] border border-white/[0.05] px-4 py-2.5 backdrop-blur-md hover:bg-white/[0.06]"
+                    style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                 >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     Secure Logout
@@ -167,8 +152,8 @@ function GuestDashboardInner() {
                 <motion.div variants={itemVariant} className="w-full text-left mb-8">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-3xl sm:text-4xl font-medium text-white tracking-tight mb-2">Welcome back, {guest.full_name.split(' ')[0]}</h1>
-                            <p className="text-sm text-zinc-500 font-normal tracking-wide">Accessing your secure event node and credentials.</p>
+                            <h1 className="text-3xl sm:text-4xl font-medium text-[var(--tenant-text)] tracking-tight mb-2">Welcome back, {guest.full_name.split(' ')[0]}</h1>
+                            <p className="text-sm text-[var(--tenant-text)] opacity-60 font-normal tracking-wide">Accessing your secure event node and credentials.</p>
                         </div>
                         <div className="flex sm:justify-end">
                             {renderStatusBadge(guest.current_state)}
@@ -176,27 +161,42 @@ function GuestDashboardInner() {
                     </div>
                 </motion.div>
 
-                {/* ARCHITECTURE: 3-Tab Controller */}
+                {/* ARCHITECTURE: Dynamic 3-Tab Controller */}
                 <motion.div variants={itemVariant} className="w-full flex justify-start mb-8 overflow-x-auto pb-2 scrollbar-hide">
-                    <div className="inline-flex bg-white/[0.02] border border-white/[0.05] p-1 rounded-full backdrop-blur-md whitespace-nowrap">
+                    <div className="inline-flex bg-white/[0.02] border border-white/[0.05] p-1 backdrop-blur-md whitespace-nowrap" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
                         <button 
                             onClick={() => setActiveTab('dashboard')}
-                            className={`px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-white text-black shadow-lg shadow-white/10' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]'}`}
+                            className={`px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'dashboard' ? 'shadow-lg shadow-white/10' : 'opacity-60 hover:opacity-100 hover:bg-white/[0.03]'}`}
+                            style={{ 
+                                backgroundColor: activeTab === 'dashboard' ? 'var(--tenant-text)' : 'transparent',
+                                color: activeTab === 'dashboard' ? 'var(--tenant-bg)' : 'var(--tenant-text)',
+                                borderRadius: 'var(--tenant-btn-radius)'
+                            }}
                         >
                             Identity Hub
                         </button>
                         <button 
                             onClick={() => setActiveTab('feed')}
-                            className={`px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 flex items-center gap-2 ${activeTab === 'feed' ? 'bg-sky-500 text-black shadow-lg shadow-sky-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]'}`}
+                            className={`px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 flex items-center gap-2 ${activeTab === 'feed' ? 'shadow-lg' : 'opacity-60 hover:opacity-100 hover:bg-white/[0.03]'}`}
+                            style={{ 
+                                backgroundColor: activeTab === 'feed' ? 'var(--tenant-primary)' : 'transparent',
+                                color: activeTab === 'feed' ? 'var(--tenant-bg)' : 'var(--tenant-text)',
+                                borderRadius: 'var(--tenant-btn-radius)'
+                            }}
                         >
                             Global Abyss
                             {isConnected && activeTab !== 'feed' && (
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--tenant-primary)' }}></span>
                             )}
                         </button>
                         <button 
                             onClick={() => setActiveTab('directory')}
-                            className={`px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'directory' ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]'}`}
+                            className={`px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'directory' ? 'shadow-lg' : 'opacity-60 hover:opacity-100 hover:bg-white/[0.03]'}`}
+                            style={{ 
+                                backgroundColor: activeTab === 'directory' ? 'var(--tenant-accent)' : 'transparent',
+                                color: activeTab === 'directory' ? 'var(--tenant-bg)' : 'var(--tenant-text)',
+                                borderRadius: 'var(--tenant-btn-radius)'
+                            }}
                         >
                             Direct Mesh
                         </button>
@@ -216,25 +216,29 @@ function GuestDashboardInner() {
                                 className="w-full"
                             >
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mb-6">
-                                    <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)]">
-                                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-indigo-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
-                                        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '6s' }} />
+                                    {/* Identity Node Card */}
+                                    <div 
+                                        className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] p-8 transition-all duration-500 hover:-translate-y-1 hover:[box-shadow:0_0_30px_color-mix(in_srgb,var(--tenant-primary)_15%,transparent)]"
+                                        style={{ borderRadius: 'var(--tenant-radius)' }}
+                                    >
+                                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none transform-gpu" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-primary) 15%, transparent), transparent)' }} />
+                                        <div className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0 transform-gpu" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-primary) 10%, transparent)', animationDuration: '6s' }} />
 
                                         <div className="relative z-10">
                                             <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08]">
-                                                    <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                                <div className="w-10 h-10 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08]" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
+                                                    <svg className="w-5 h-5 text-[var(--tenant-text)] opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                                 </div>
-                                                <h2 className="text-sm font-semibold text-zinc-200 tracking-wide">Identity Node</h2>
+                                                <h2 className="text-sm font-semibold tracking-wide text-[var(--tenant-text)]">Identity Node</h2>
                                             </div>
                                             <div className="space-y-6">
                                                 <div>
-                                                    <span className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Secure ID</span>
-                                                    <span className="font-mono text-zinc-300 text-xs block bg-white/[0.03] p-3 rounded-2xl border border-white/[0.05] break-all">{guest.id}</span>
+                                                    <span className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--tenant-text)', opacity: 0.5 }}>Secure ID</span>
+                                                    <span className="font-mono text-xs block bg-white/[0.03] p-3 border border-white/[0.05] break-all" style={{ color: 'var(--tenant-text)', opacity: 0.8, borderRadius: 'var(--tenant-btn-radius)' }}>{guest.id}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="block text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-2">Government ID</span>
-                                                    <a href={guest.id_document_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold text-zinc-300 hover:text-white inline-flex items-center gap-2 transition-colors w-fit">
+                                                    <span className="block text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--tenant-text)', opacity: 0.5 }}>Government ID</span>
+                                                    <a href={guest.id_document_url} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:opacity-80 inline-flex items-center gap-2 transition-opacity w-fit" style={{ color: 'var(--tenant-text)', opacity: 0.8 }}>
                                                         Verify Submission
                                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                                     </a>
@@ -243,73 +247,81 @@ function GuestDashboardInner() {
                                         </div>
                                     </div>
 
-                                    <div className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] rounded-[32px] p-8 transition-all duration-500 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(139,92,246,0.1)]">
-                                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-violet-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none" />
-                                        <div className="absolute -top-32 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0" style={{ animationDuration: '7s' }} />
+                                    {/* Profile Attributes Card */}
+                                    <div 
+                                        className="group relative overflow-hidden bg-white/[0.02] backdrop-blur-xl border border-white/[0.05] p-8 transition-all duration-500 hover:-translate-y-1 hover:[box-shadow:0_0_30px_color-mix(in_srgb,var(--tenant-accent)_15%,transparent)]"
+                                        style={{ borderRadius: 'var(--tenant-radius)' }}
+                                    >
+                                        <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-500 ease-out z-0 pointer-events-none transform-gpu" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-accent) 15%, transparent), transparent)' }} />
+                                        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full blur-[100px] animate-pulse pointer-events-none transition-opacity duration-300 ease-out opacity-50 group-hover:opacity-100 z-0 transform-gpu" style={{ backgroundColor: 'color-mix(in srgb, var(--tenant-accent) 10%, transparent)', animationDuration: '7s' }} />
 
                                         <div className="relative z-10">
                                             <div className="flex items-center gap-3 mb-6">
-                                                <div className="w-10 h-10 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08]">
-                                                    <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                                <div className="w-10 h-10 bg-white/[0.03] rounded-full flex items-center justify-center border border-white/[0.08]" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
+                                                    <svg className="w-5 h-5 text-[var(--tenant-text)] opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                                 </div>
-                                                <h2 className="text-sm font-semibold text-zinc-200 tracking-wide">Profile Attributes</h2>
+                                                <h2 className="text-sm font-semibold tracking-wide text-[var(--tenant-text)]">Profile Attributes</h2>
                                             </div>
                                             <div className="space-y-6">
                                                 <div className="flex justify-between items-center border-b border-white/[0.03] pb-4">
-                                                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Network Contact</span>
-                                                    <span className="text-xs font-mono text-zinc-300">{guest.phone || 'N/A'}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tenant-text)', opacity: 0.5 }}>Network Contact</span>
+                                                    <span className="text-xs font-mono text-[var(--tenant-text)] opacity-80">{guest.phone || 'N/A'}</span>
                                                 </div>
                                                 <div className="flex flex-col gap-2">
-                                                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Dietary Specs</span>
-                                                    <span className="text-xs text-zinc-300 font-medium leading-relaxed">{guest.dietary_restrictions || 'No restrictions committed to ledger.'}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tenant-text)', opacity: 0.5 }}>Dietary Specs</span>
+                                                    <span className="text-xs font-medium leading-relaxed text-[var(--tenant-text)] opacity-80">{guest.dietary_restrictions || 'No restrictions committed to ledger.'}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] rounded-[32px] transition-all duration-500 hover:shadow-[0_0_30px_rgba(217,70,239,0.08)]">
-                                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent via-fuchsia-400/10 to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none" />
+                                {/* Event Itinerary Full-Width Card */}
+                                <div 
+                                    className="group relative overflow-hidden w-full bg-white/[0.02] backdrop-blur-2xl border border-white/[0.05] transition-all duration-500 hover:shadow-[0_0_30px_color-mix(in_srgb,var(--tenant-primary)_8%,transparent)]"
+                                    style={{ borderRadius: 'var(--tenant-radius)' }}
+                                >
+                                    <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[250%] transition-all duration-700 ease-out z-0 pointer-events-none transform-gpu" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-primary) 10%, transparent), transparent)' }} />
                                     
                                     <div className="relative z-10">
                                         <div className="px-8 py-5 border-b border-white/[0.03] flex justify-between items-center">
-                                            <h2 className="text-xs font-bold text-zinc-400 tracking-[0.2em] uppercase">Event Itinerary</h2>
-                                            <span className="text-[10px] font-mono text-zinc-600 uppercase">Hub: {eventSlug.replace(/-/g, ' ')}</span>
+                                            <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-[var(--tenant-text)] opacity-70">Event Itinerary</h2>
+                                            <span className="text-[10px] font-mono uppercase" style={{ color: 'var(--tenant-text)', opacity: 0.4 }}>Hub: {eventSlug.replace(/-/g, ' ')}</span>
                                         </div>
                                         <div className="p-8">
                                             {isLoadingSchedule ? (
                                                 <div className="flex justify-center items-center py-8">
-                                                    <svg className="animate-spin h-5 w-5 text-fuchsia-500/50" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                    <svg className="animate-spin h-5 w-5 opacity-50 text-[var(--tenant-text)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                                                 </div>
                                             ) : scheduleNodes.length === 0 ? (
                                                 <div className="text-center py-8">
-                                                    <p className="text-sm text-zinc-500 font-normal italic">The node administrator has not injected a timeline yet.</p>
+                                                    <p className="text-sm font-normal italic opacity-50 text-[var(--tenant-text)]">The node administrator has not injected a timeline yet.</p>
                                                 </div>
                                             ) : (
                                                 <div className="space-y-4">
                                                     {scheduleNodes.map((node, idx) => (
-                                                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 p-4 rounded-2xl bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.03] transition-colors group/node">
+                                                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 p-4 bg-white/[0.01] border border-white/[0.03] hover:bg-white/[0.03] transition-colors group/node" style={{ borderRadius: 'var(--tenant-btn-radius)' }}>
                                                             <div className="w-full sm:w-32 flex-shrink-0">
-                                                                <p className="text-xs font-mono text-fuchsia-400/80 group-hover/node:text-fuchsia-400 transition-colors">
+                                                                <p className="text-xs font-mono font-bold transition-colors opacity-80 group-hover/node:opacity-100" style={{ color: 'var(--tenant-primary)' }}>
                                                                     {new Date(node.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </p>
-                                                                <p className="text-[10px] font-mono text-zinc-600 mt-1">
+                                                                <p className="text-[10px] font-mono opacity-50 mt-1 text-[var(--tenant-text)]">
                                                                     {new Date(node.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                 </p>
                                                             </div>
                                                             <div className="flex-1">
-                                                                <h3 className="text-sm font-bold text-zinc-200">{node.title}</h3>
+                                                                <h3 className="text-sm font-bold text-[var(--tenant-text)]">{node.title}</h3>
                                                                 {(node.speaker_name || node.location) && (
                                                                     <div className="flex items-center gap-3 mt-2">
                                                                         {node.speaker_name && (
-                                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tenant-text)', opacity: 0.5 }}>
                                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                                                                 {node.speaker_name}
                                                                             </span>
                                                                         )}
-                                                                        {node.speaker_name && node.location && <span className="w-1 h-1 rounded-full bg-zinc-700" />}
+                                                                        {node.speaker_name && node.location && <span className="w-1 h-1 rounded-full bg-white/20" />}
                                                                         {node.location && (
-                                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                                                                            <span className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--tenant-accent)', opacity: 0.8 }}>
                                                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                                                                                 {node.location}
                                                                             </span>
@@ -317,7 +329,7 @@ function GuestDashboardInner() {
                                                                     </div>
                                                                 )}
                                                                 {node.description && (
-                                                                    <p className="text-xs text-zinc-400 mt-2 leading-relaxed">{node.description}</p>
+                                                                    <p className="text-xs mt-3 leading-relaxed opacity-60 text-[var(--tenant-text)]">{node.description}</p>
                                                                 )}
                                                             </div>
                                                         </div>
