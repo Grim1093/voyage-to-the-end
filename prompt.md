@@ -287,7 +287,7 @@ Client-side network API wrapper modules.
 
 ## Database Structure
 
-
+```
 ================================================================
    [Architecture] DATABASE SCHEMA MAPPER Engaged
 ================================================================
@@ -432,6 +432,8 @@ created_at                | timestamp with time zone  | YES        | CURRENT_TIM
 ------------------------------------------------------------------------------------------
 
 ✅ System Architecture Mapping Complete.
+
+```
 
 
 update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and database structure  and in the end of the file copy this prompt and do not copy anything beyond this line.
