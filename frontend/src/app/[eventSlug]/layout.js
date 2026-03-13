@@ -8,23 +8,43 @@ import { fetchEventDetails } from '../../services/api';
 import { AmbientAurora } from '@/components/ui/ambient-aurora';
 import { InteractiveAura } from '@/components/ui/interactive-aura';
 
+// [Architecture] Client-Side Mobile Detector
+// Hydration-safe hook to isolate mobile logic without breaking Server-Side Rendering or desktop styles.
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+    
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 1024); // lg breakpoint
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    
+    return isMobile;
+};
+
 // [Architecture] Stateful Cinematic Hero Engine (Moved to Global Layout)
-const HeroSlideshow = memo(({ images }) => {
+// [Architecture] Mobile Hardware Degradation: Halts intervals, flattens image arrays, and disables GPU scale transforms on touch devices to save battery.
+const HeroSlideshow = memo(({ images, isMobile }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loadedImages, setLoadedImages] = useState({});
 
     useEffect(() => {
-        if (!images || images.length <= 1) return;
+        // Halt interval completely on mobile; static first image is sufficient
+        if (!images || images.length <= 1 || isMobile) return; 
         const timer = setInterval(() => setCurrentIndex((prev) => (prev + 1) % images.length), 5000);
         return () => clearInterval(timer);
-    }, [images]);
+    }, [images, isMobile]);
 
     if (!images || images.length === 0) return null;
 
+    // Aggressive DOM pruning for mobile: Only render the active image instead of the full array
+    const imagesToRender = isMobile ? [images[0]] : images;
+
     return (
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden bg-transparent">
-            {images.map((src, index) => {
-                const isActive = currentIndex === index;
+            {imagesToRender.map((src, index) => {
+                const isActive = isMobile ? true : currentIndex === index;
                 const isLoaded = !!loadedImages[src];
 
                 return (
@@ -33,7 +53,7 @@ const HeroSlideshow = memo(({ images }) => {
                         initial={{ opacity: 0, scale: 1 }} 
                         animate={{ 
                             opacity: isActive && isLoaded ? 1 : 0, 
-                            scale: isActive ? 1.05 : 1, 
+                            scale: isActive && !isMobile ? 1.05 : 1, // Disable GPU scale repaints on mobile
                             zIndex: isActive ? 10 : 0 
                         }}
                         transition={{ opacity: { duration: 1.5, ease: "easeInOut" }, scale: { duration: 10, ease: "linear" } }}
@@ -75,6 +95,7 @@ export default function EventLayout({ children }) {
     const pathname = usePathname();
     const eventSlug = params.eventSlug;
     const context = `[Event Layout Wrapper - ${eventSlug}]`;
+    const isMobile = useIsMobile();
 
     const [eventData, setEventData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -99,7 +120,8 @@ export default function EventLayout({ children }) {
         return (
             <div className="min-h-screen bg-[#09090b] flex flex-col items-center justify-center relative overflow-hidden">
                 <AmbientAurora />
-                <InteractiveAura />
+                {/* Architecture: Do not track mouse on loading screen if on mobile */}
+                {!isMobile && <InteractiveAura />}
             </div>
         );
     }
@@ -110,6 +132,7 @@ export default function EventLayout({ children }) {
     
     // ARCHITECTURE: Context-Aware Layer Detection
     // Determines if the user is in the deep Application Layer (Dashboard) vs the Marketing Layer
+    // Strictly enforcing the rule: Heavy image backgrounds are ONLY for Hub, Register, and Portal entrance.
     const isAppLayer = pathname.includes('/dashboard');
     const showImageBackground = hasImages && !isAppLayer;
     
@@ -138,7 +161,7 @@ export default function EventLayout({ children }) {
             <AnimatePresence mode="wait">
                 {showImageBackground ? (
                     <motion.div key="bg-images" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 z-0">
-                        <HeroSlideshow images={images} />
+                        <HeroSlideshow images={images} isMobile={isMobile} />
                     </motion.div>
                 ) : (
                     <motion.div key="bg-aurora" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 z-0">
@@ -149,7 +172,8 @@ export default function EventLayout({ children }) {
                 )}
             </AnimatePresence>
 
-            <InteractiveAura />
+            {/* Architecture: Completely unmount the heavy cursor-tracking component on touch devices to free up the main thread */}
+            {!isMobile && <InteractiveAura />}
             
             {/* Seamless Page Router */}
             <AnimatePresence mode="wait">
