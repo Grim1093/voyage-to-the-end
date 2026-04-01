@@ -15,6 +15,7 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 - **Global Directory & Edge Routing:** Public-facing hub for discovering events, combined with Vercel Edge Middleware (`proxy.js`) for dynamic custom domain resolution directly mapped to specific event Nodes.
 - **Telemetry Rule:** Comprehensive server-side logging at every step of the backend data pipeline.
 - **The Abyss (Transport Layer):** WebSocket and Valkey (Redis) integration for real-time mesh connectivity. Supports ephemeral event meshes and direct messaging between guests with horizontal scaling capabilities. Includes background CRON jobs for node dissolution and email extraction pipelines.
+- **Access Code Features:** Includes a mechanism for robust generation and secure email dispatch of access codes, complete with a cooldown mechanism for resend functionality to prevent abuse and manage rate limits.
 
 ## Complete Project Structure
 
@@ -22,112 +23,109 @@ The core goal of this repository is to provide a high-end, multi-tenant MICE (Me
 .
 ├── README.md
 ├── backend
-│   ├── .gitignore
-│   ├── README.md
-│   ├── database
-│   │   └── init.sql
-│   ├── migrate.js
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── scripts
-│   │   ├── printSchema.js
-│   │   └── setupDb.js
-│   └── src
-│       ├── config
-│       │   ├── cache.js
-│       │   └── db.js
-│       ├── controllers
-│       │   ├── abyssController.js
-│       │   ├── authController.js
-│       │   ├── eventController.js
-│       │   ├── guestController.js
-│       │   └── tenantController.js
-│       ├── middleware
-│       │   ├── authMiddleware.js
-│       │   └── socketAuth.js
-│       ├── routes
-│       │   ├── authRoutes.js
-│       │   ├── eventRoutes.js
-│       │   ├── guestRoutes.js
-│       │   └── tenantRoutes.js
-│       ├── server.js
-│       ├── services
-│       │   ├── emailService.js
-│       │   ├── meshDissolver.js
-│       │   └── vercelService.js
-│       └── utils
-│           ├── createAdmin.js
-│           ├── logger.js
-│           ├── migrateAbyss.js
-│           └── migrateThemes.js
+│   ├── .gitignore
+│   ├── README.md
+│   ├── database
+│   │   └── init.sql
+│   ├── migrate.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── scripts
+│   │   ├── printSchema.js
+│   │   └── setupDb.js
+│   └── src
+│       ├── config
+│       │   ├── cache.js
+│       │   └── db.js
+│       ├── controllers
+│       │   ├── abyssController.js
+│       │   ├── authController.js
+│       │   ├── eventController.js
+│       │   ├── guestController.js
+│       │   └── tenantController.js
+│       ├── middleware
+│       │   ├── authMiddleware.js
+│       │   └── socketAuth.js
+│       ├── routes
+│       │   ├── authRoutes.js
+│       │   ├── eventRoutes.js
+│       │   ├── guestRoutes.js
+│       │   └── tenantRoutes.js
+│       ├── server.js
+│       ├── services
+│       │   ├── emailService.js
+│       │   ├── meshDissolver.js
+│       │   └── vercelService.js
+│       └── utils
+│           ├── createAdmin.js
+│           ├── logger.js
+│           ├── migrateAbyss.js
+│           └── migrateThemes.js
 ├── frontend
-│   ├── .gitignore
-│   ├── README.md
-│   ├── components.json
-│   ├── eslint.config.mjs
-│   ├── jsconfig.json
-│   ├── next.config.mjs
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.mjs
-│   ├── public
-│   │   ├── file.svg
-│   │   ├── globe.svg
-│   │   ├── next.svg
-│   │   ├── vercel.svg
-│   │   └── window.svg
-│   └── src
-│       ├── app
-│       │   ├── [eventSlug]
-│       │   │   ├── layout.js
-│       │   │   ├── page.js
-│       │   │   ├── portal
-│       │   │   │   ├── dashboard
-│       │   │   │   │   └── page.js
-│       │   │   │   └── page.js
-│       │   │   └── register
-│       │   │       └── page.js
-│       │   ├── admin
-│       │   │   ├── [eventSlug]
-│       │   │   │   └── page.js
-│       │   │   ├── events
-│       │   │   │   ├── [eventSlug]
-│       │   │   │   │   └── edit
-│       │   │   │   │       └── page.js
-│       │   │   │   └── new
-│       │   │   │       └── page.js
-│       │   │   ├── login
-│       │   │   │   └── page.js
-│       │   │   └── page.js
-│       │   ├── favicon.ico
-│       │   ├── globals.css
-│       │   ├── layout.js
-│       │   ├── ledger
-│       │   │   └── page.js
-│       │   ├── page.js
-│       │   └── test-cursor
-│       │       └── page.js
-│       ├── components
-│       │   ├── AbyssProvider.jsx
-│       │   ├── GuestIntakeForm.jsx
-│       │   ├── portal
-│       │   │   ├── GlobalFeed.jsx
-│       │   │   └── GuestDirectory.jsx
-│       │   └── ui
-│       │       ├── ambient-aurora.jsx
-│       │       ├── custom-cursor.jsx
-│       │       ├── encrypted-text.jsx
-│       │       ├── interactive-aura.jsx
-│       │       └── luma-dropdown.jsx
-│       ├── lib
-│       │   └── utils.js
-│       ├── proxy.js
-│       └── services
-│           └── api.js
-├── prompt.md
-└── tree.txt
-
-33 directories, 74 files
+│   ├── .gitignore
+│   ├── README.md
+│   ├── components.json
+│   ├── eslint.config.mjs
+│   ├── jsconfig.json
+│   ├── next.config.mjs
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.mjs
+│   ├── public
+│   │   ├── file.svg
+│   │   ├── globe.svg
+│   │   ├── next.svg
+│   │   ├── vercel.svg
+│   │   └── window.svg
+│   └── src
+│       ├── app
+│       │   ├── [eventSlug]
+│       │   │   ├── layout.js
+│       │   │   ├── page.js
+│       │   │   ├── portal
+│       │   │   │   ├── dashboard
+│       │   │   │   │   └── page.js
+│       │   │   │   └── page.js
+│       │   │   └── register
+│       │   │       └── page.js
+│       │   ├── admin
+│       │   │   ├── [eventSlug]
+│       │   │   │   └── page.js
+│       │   │   ├── events
+│       │   │   │   ├── [eventSlug]
+│       │   │   │   │   └── edit
+│       │   │   │   │       └── page.js
+│       │   │   │   └── new
+│       │   │   │       └── page.js
+│       │   │   ├── login
+│       │   │   │   └── page.js
+│       │   │   └── page.js
+│       │   ├── favicon.ico
+│       │   ├── globals.css
+│       │   ├── layout.js
+│       │   ├── ledger
+│       │   │   └── page.js
+│       │   ├── page.js
+│       │   └── test-cursor
+│       │       └── page.js
+│       ├── components
+│       │   ├── AbyssProvider.jsx
+│       │   ├── GuestIntakeForm.jsx
+│       │   ├── portal
+│       │   │   ├── GlobalFeed.jsx
+│       │   │   └── GuestDirectory.jsx
+│       │   └── ui
+│       │       ├── ambient-aurora.jsx
+│       │       ├── custom-cursor.jsx
+│       │       ├── encrypted-text.jsx
+│       │       ├── interactive-aura.jsx
+│       │       └── luma-dropdown.jsx
+│       ├── lib
+│       │   └── utils.js
+│       ├── proxy.js
+│       └── services
+│           └── api.js
+└── prompt.md
 ```
 
 ## Detailed File and Folder Definitions
@@ -168,7 +166,7 @@ Express route handlers that separate core business logic from routing.
 - **`backend/src/controllers/abyssController.js`:** Central control hub for The Abyss (WebSockets). Handles ephemeral mesh logic, echos, direct messaging, and presence.
 - **`backend/src/controllers/authController.js`:** Manages administrative control plane authentication, admin login, and issuing JWT access tokens.
 - **`backend/src/controllers/eventController.js`:** Handles full CRUD lifecycle for Event Tenants and dispatches Vercel Edge proxy routing updates.
-- **`backend/src/controllers/guestController.js`:** Manages attendee onboarding, ticket registrations, guest profiles, and JWT token minting for attendees.
+- **`backend/src/controllers/guestController.js`:** Manages attendee onboarding, ticket registrations, guest profiles, JWT token minting for attendees, and access code resend functionality with cooldown mechanisms.
 - **`backend/src/controllers/tenantController.js`:** Enforces RBAC logic for Organization and User provisioning.
 
 **`backend/src/middleware/`**
@@ -188,8 +186,8 @@ Master entrypoint and Control Plane boot sequence. Wraps the Express app, mounts
 
 **`backend/src/services/`**
 Encapsulates external API integrations and background orchestration.
-- **`backend/src/services/emailService.js`:** Dispatches transactional emails utilizing a direct HTTPS REST API transport.
-- **`backend/src/services/meshDissolver.js`:** Ephemeral CRON background worker that routiney queries for expired Nodes and dissolves the websocket mesh.
+- **`backend/src/services/emailService.js`:** Dispatches transactional emails utilizing a direct HTTPS REST API transport, utilizing cooldowns to limit repeated requests.
+- **`backend/src/services/meshDissolver.js`:** Ephemeral CRON background worker that routinely queries for expired Nodes and dissolves the websocket mesh.
 - **`backend/src/services/vercelService.js`:** Integrates with Vercel APIs for dynamic custom domain edge routing logic for MSaaS white-labeling.
 
 **`backend/src/utils/`**
@@ -287,7 +285,7 @@ Client-side network API wrapper modules.
 
 ## Database Structure
 
-```
+```text
 ================================================================
    [Architecture] DATABASE SCHEMA MAPPER Engaged
 ================================================================
@@ -430,11 +428,7 @@ id                        | integer                   | NO         | nextval('or
 name                      | varchar(255)              | NO         | NULL
 created_at                | timestamp with time zone  | YES        | CURRENT_TIMESTAMP
 ------------------------------------------------------------------------------------------
-
-✅ System Architecture Mapping Complete.
-
 ```
-
 
 update prompt.md file in root folder containing everything, our main goal, complete project structure in detail including every file and folder (except node_modules), what is done in the project and what can it do, its capabilities and first read every file then define each file in detail about what it does and define each folder about what it does and database structure  and in the end of the file copy this prompt and do not copy anything beyond this line.
 current database

@@ -29,8 +29,18 @@ Frontend Unit testing leverages Node.js's native test runner (`node:test`) and `
 The frontend leverages the Next.js App Router to deliver a seamless, globally available structure.
 
 - **Global Public Directory (`app/page.js`):** The landing page serving as a unified directory for all public events available on the MSaaS platform.
-- **Control Plane (`app/admin/events/...`):** The administrative dashboard for the deployment, configuration, and editing of events.
-- **Public Event Hub (`app/[eventSlug]/page.js`):** Dynamically generated, standalone pages for each individual event.
+- **Control Plane (`app/admin/...`):** The administrative dashboard for the deployment, configuration, and editing of events, including nested pages for specific events (`app/admin/[eventSlug]/page.js`) and new event configuration (`app/admin/events/new/page.js`).
+- **Public Event Hub (`app/[eventSlug]/page.js`):** Dynamically generated, standalone pages for each individual event node.
+- **Registration Hub (`app/[eventSlug]/register/page.js`):** Entry portal for attendee registration and access code collection.
+- **Event Portal Dashboard (`app/[eventSlug]/portal/dashboard/page.js`):** Gated access lobby initialized with `AbyssProvider.jsx` that connects guests to the global real-time mesh for features like the global feed (`components/portal/GlobalFeed.jsx`) and directory (`components/portal/GuestDirectory.jsx`).
+
+## UI Component Library
+Low-level atomic UI components engineered for high-performance Framer Motion transitions and GPU load management (`components/ui/`):
+- `ambient-aurora.jsx`
+- `custom-cursor.jsx`
+- `encrypted-text.jsx`
+- `interactive-aura.jsx`
+- `luma-dropdown.jsx`
 
 ## GPU Optimizations Achieved
 To realize our ultra-premium, cinematic aesthetic, performance is critical. We've optimized the frontend for hardware acceleration, offloading complex tasks to the GPU.
@@ -44,10 +54,12 @@ Our animation architecture is built entirely around Framer Motion, enabling comp
 
 - **Framer Motion Layout Transitions:** Utilizing `<AnimatePresence mode="popLayout">`, we achieve elegant entry and exit animations for components, maintaining a consistent, high-end feel as the UI state changes.
 - **Bento Grid Layouts:** We employ bento grid structures to present information cleanly and hierarchically, often paired with subtle hover states and entry animations to create an engaging experience.
-- **Ambient Aurora (`components/ui/ambient-aurora.js`):** A custom, hardware-accelerated, zero-blur radial gradient component that serves as the cinematic backdrop for our dark-mode aesthetic. This component provides dynamic, visually arresting backgrounds without the performance overhead of traditional CSS blurs.
+- **Ambient Aurora (`components/ui/ambient-aurora.jsx`):** A custom, hardware-accelerated, zero-blur radial gradient component that serves as the cinematic backdrop for our dark-mode aesthetic. This component provides dynamic, visually arresting backgrounds without the performance overhead of traditional CSS blurs.
+- **Custom Cursor (`components/ui/custom-cursor.jsx`):** An animated liquid ring trailing effect custom cursor used throughout the app for premium feel.
 
 ## Security Practices
 - **CSS/Style Injection:** Avoid using `dangerouslySetInnerHTML` for CSS/style injection to prevent XSS. Prefer defining global utility classes in `globals.css` and toggling them on the root element (`document.documentElement`) via React's `useEffect` hook.
 
 ## Socket Architecture
-- **Presence Broadcasting:** Socket presence broadcasting is triggered by the `join_abyss` event. In React components, this emission should be isolated in a `useEffect` hook dependent only on `[socket, isConnected]` to prevent redundant broadcasts during internal state changes (e.g., switching active chats).
+- **Presence Broadcasting:** Socket presence broadcasting is triggered by the `join_abyss` event within the `AbyssProvider`. In React components, this emission should be isolated in a `useEffect` hook dependent only on `[socket, isConnected]` to prevent redundant broadcasts during internal state changes (e.g., switching active chats).
+- **Abyss Provider (`components/AbyssProvider.jsx`):** Wraps portal components to establish, maintain, and inject web sockets securely.
