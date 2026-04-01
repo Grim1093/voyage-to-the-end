@@ -15,6 +15,7 @@ To date, the platform has accomplished the following global milestones:
 - **Admin Control Plane Active:** The central management dashboard is live, enabling seamless oversight of all nodes.
 - **GPU Performance Optimized:** Eliminated expensive CSS operations (like moving Gaussian blurs) in favor of hardware-accelerated alternatives (e.g., concurrent z-index fading, optimized next/image loading).
 - **Global Directory Built:** A public-facing hub for discovering and accessing events is fully functional.
+- **Access Code Resend Cooldown Mechanism:** Added robust capabilities to generate and securely send user access codes with a rate limiting and cooldown mechanism integrated into the registration loop.
 
 ## System Terminology
 To maintain consistency across the codebase, please adhere to the following terminology:
@@ -28,13 +29,19 @@ To maintain consistency across the codebase, please adhere to the following term
 - **Database:** PostgreSQL (hosted on Aiven) accessed via `pg` pool.
 
 ## Database Architecture
-The Global Ledger is built on PostgreSQL hosted on Aiven via `pg` pool, with all timezones strictly locked to UTC.
+The Global Ledger is built on PostgreSQL hosted on Aiven via `pg` pool, with all timezones strictly locked to UTC. Key tables include:
 
-- **`events`:** `id`, `slug`, `name`, `start_date`, `end_date`, `description`, `location`, `is_public`, `created_at`.
+- **`events`:** `id`, `slug`, `name`, `start_date`, `end_date`, `description`, `location`, `is_public`, `created_at`, `mesh_dissolved`, `custom_domain`, `theme_config`, `organization_id`.
 - **`event_images`:** `id`, `event_id` (FK CASCADE), `image_url`, `display_order`, `created_at`.
 - **`guests` (The Global Identity Vault):** `id` (UUID), `full_name`, `email` (UNIQUE), `phone`, `created_at`, `updated_at`.
-- **`event_registrations` (The Event Junction):** `id` (UUID), `guest_id` (FK CASCADE), `event_id` (FK CASCADE), `access_code`, `id_number`, `id_document_url`, `dietary_restrictions`, `current_state`, `error_log`, `registered_at`. (Unique constraint on `guest_id` + `event_id` to prevent duplicate registrations).
+- **`event_registrations` (The Event Junction):** `id` (UUID), `guest_id` (FK CASCADE), `event_id` (FK CASCADE), `access_code`, `id_number`, `id_document_url`, `dietary_restrictions`, `current_state`, `error_log`, `registered_at`.
 - **`event_schedules` (The Itinerary Engine):** `id` (UUID), `event_id` (FK CASCADE), `title`, `description`, `speaker_name`, `location`, `start_time`, `end_time`, `created_at`, `updated_at`.
+- **`organizations`:** `id`, `name`, `created_at`.
+- **`admins`:** `id`, `email`, `password_hash`, `role`, `organization_id`.
+- **`event_staff_assignments`:** `admin_id`, `event_id`, `created_at`.
+- **`global_echos`:** `id`, `event_id`, `guest_id`, `content`, `created_at`.
+- **`finalized_echos`:** `id`, `event_id`, `initiator_id`, `receiver_id`, `created_at`.
+- **`direct_messages`:** `id`, `event_id`, `sender_id`, `receiver_id`, `content`, `created_at`.
 
 ## Role-Based Access Control (RBAC)
 The platform supports RBAC with isolated Organization nodes, specifically defined as:
