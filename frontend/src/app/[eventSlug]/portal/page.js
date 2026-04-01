@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link'; 
 import { motion } from 'framer-motion';
@@ -16,6 +16,20 @@ export default function GuestPortalLogin() {
     const [formData, setFormData] = useState({ email: '', accessCode: '' });
     const [status, setStatus] = useState('idle'); // idle | loading | error | success
     const [message, setMessage] = useState('');
+    
+    // [Architecture] State to track the rate-limiting cooldown period (in seconds)
+    const [cooldown, setCooldown] = useState(0);
+
+    // [Architecture] Lifecycle hook to manage the countdown timer independently of main thread blocking
+    useEffect(() => {
+        if (cooldown <= 0) return;
+
+        const timer = setInterval(() => {
+            setCooldown((prev) => prev - 1);
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [cooldown]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -61,6 +75,12 @@ export default function GuestPortalLogin() {
     const handleResendCode = async () => {
         console.log(`${context} Step 1: Guest code recovery triggered.`);
         
+        // Block execution if the cooldown is active
+        if (cooldown > 0) {
+            console.warn(`${context} Failure Point R-THROTTLE: Request rejected. Cooldown active for ${cooldown}s.`);
+            return;
+        }
+
         if (!formData.email) {
             console.warn(`${context} Failure Point R-UI: Email missing for recovery.`);
             setStatus('error');
@@ -75,13 +95,15 @@ export default function GuestPortalLogin() {
             console.log(`${context} Step 2: Hitting backend code recovery endpoint...`);
             await resendAccessCode(eventSlug, formData.email);
             
-            console.log(`${context} Step 3: Code recovery request successful.`);
+            console.log(`${context} Step 3: Code recovery request successful. Engaging 60s cooldown.`);
             setStatus('success');
             setMessage('A new access code has been dispatched to your email.');
+            setCooldown(60); // Initialize the throttle
         } catch (error) {
             console.error(`${context} CRITICAL FAILURE (Failure Point R-UI-Fail):`, error.message);
             setStatus('error');
             setMessage(error.message || 'Failed to resend access code. Please verify your email or try again.');
+            setCooldown(60); // Engage throttle even on error to prevent spamming the error state
         }
     };
 
@@ -151,28 +173,42 @@ export default function GuestPortalLogin() {
 
                             <div>
                                 <label className="block text-[10px] font-bold text-[var(--tenant-text)] opacity-60 mb-2 uppercase tracking-[0.15em] ml-1">Registered Email</label>
-                                {/* [Architecture] Mobile UI: Set text-[16px] to prevent iOS zoom */}
-                                <input 
-                                    type="email" 
-                                    name="email"
-                                    value={formData.email} 
-                                    onChange={handleChange} 
-                                    className="w-full px-4 sm:px-5 py-3 sm:py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] text-[16px] sm:text-sm" 
-                                    style={{ borderRadius: 'var(--tenant-btn-radius)' }}
-                                    placeholder="guest@enterprise.com" 
-                                    disabled={status === 'loading'}
-                                />
+                                {/* [Architecture] Wrapper div with relative positioning for inline button */}
+                                <div className="relative">
+                                    <input 
+                                        type="email" 
+                                        name="email"
+                                        value={formData.email} 
+                                        onChange={handleChange} 
+                                        className="w-full pl-4 pr-24 sm:pl-5 sm:pr-28 py-3 sm:py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] text-[16px] sm:text-sm [&:-webkit-autofill]:shadow-[0_0_0_1000px_rgba(0,0,0,0.8)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--tenant-text)] [&:-webkit-autofill]:transition-none" 
+                                        style={{ borderRadius: 'var(--tenant-btn-radius)' }}
+                                        placeholder="guest@enterprise.com" 
+                                        disabled={status === 'loading'}
+                                    />
+                                    {/* [Architecture] Inline dispatch button mapped to handleResendCode */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            console.log(`${context} Action: Inline Send Code button clicked.`);
+                                            handleResendCode();
+                                        }}
+                                        disabled={status === 'loading' || !formData.email || cooldown > 0}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 sm:px-4 py-1.5 bg-white/10 hover:bg-white/20 text-[var(--tenant-text)] text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-colors disabled:opacity-30 disabled:cursor-not-allowed border border-white/10"
+                                        style={{ borderRadius: 'calc(var(--tenant-btn-radius) - 2px)' }}
+                                    >
+                                        {status === 'loading' ? 'Sending...' : cooldown > 0 ? `Wait ${cooldown}s` : 'Send Code'}
+                                    </button>
+                                </div>
                             </div>
 
                             <div>
                                 <label className="block text-[10px] font-bold text-[var(--tenant-text)] opacity-60 mb-2 uppercase tracking-[0.15em] ml-1">6-Character Access Code</label>
-                                {/* [Architecture] Mobile UI: Set text-[16px] to prevent iOS zoom */}
                                 <input 
                                     type="password" 
                                     name="accessCode"
                                     value={formData.accessCode} 
                                     onChange={handleChange} 
-                                    className="w-full px-4 sm:px-5 py-3 sm:py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] uppercase tracking-[0.3em] font-mono text-[16px] sm:text-sm" 
+                                    className="w-full px-4 sm:px-5 py-3 sm:py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] uppercase tracking-[0.3em] font-mono text-[16px] sm:text-sm [&:-webkit-autofill]:shadow-[0_0_0_1000px_rgba(0,0,0,0.8)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:var(--tenant-text)] [&:-webkit-autofill]:transition-none" 
                                     style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                                     placeholder="••••••" 
                                     maxLength={6}
@@ -204,16 +240,15 @@ export default function GuestPortalLogin() {
                         </form>
 
                         <div className="mt-8 pt-5 sm:pt-6 border-t border-white/[0.05] text-center">
-                            {/* [Architecture] Mobile UI: Flex col on mobile for better touch targets, row on desktop */}
                             <p className="text-[10px] sm:text-[11px] text-[var(--tenant-text)] opacity-60 font-medium flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-1.5 tracking-wide">
                                 <span>Didn't receive your access code?</span>
                                 <button
                                     type="button"
                                     onClick={handleResendCode}
-                                    disabled={status === 'loading'}
+                                    disabled={status === 'loading' || cooldown > 0}
                                     className="font-bold opacity-100 hover:opacity-70 transition-opacity disabled:cursor-not-allowed underline decoration-white/20 underline-offset-4 py-2 sm:py-0 px-4 sm:px-0"
                                 >
-                                    Resend it
+                                    {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend it'}
                                 </button>
                             </p>
                         </div>
