@@ -12,26 +12,51 @@ const EncryptedText = dynamic(
     { ssr: false }
 );
 
+// [Architecture] Client-Side Mobile Detector
+// Hydration-safe hook to isolate heavy animations from mobile devices
+const useIsMobile = () => {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+    return isMobile;
+};
+
 // ARCHITECTURE: Global Ambient Aurora Background
-const AmbientAurora = () => (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <motion.div
-            animate={{ x: [0, 100, -50, 0], y: [0, -50, 100, 0], scale: [1, 1.1, 0.9, 1] }}
-            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-            className="absolute -top-[20%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-indigo-500/10 blur-[120px]"
-        />
-        <motion.div
-            animate={{ x: [0, -100, 50, 0], y: [0, 100, -50, 0], scale: [1, 0.9, 1.1, 1] }}
-            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            className="absolute top-[40%] -right-[10%] w-[40vw] h-[40vw] rounded-full bg-violet-500/10 blur-[120px]"
-        />
-        <motion.div
-            animate={{ x: [0, 50, -100, 0], y: [0, -100, 50, 0], scale: [1, 1.2, 0.8, 1] }}
-            transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-            className="absolute -bottom-[20%] left-[20%] w-[60vw] h-[60vw] rounded-full bg-fuchsia-500/10 blur-[120px]"
-        />
-    </div>
-);
+// [Architecture] Mobile UI: Aggressive GPU optimization. Renders deep static gradient on mobile to save battery and guarantee 60fps scrolling.
+const AmbientAurora = ({ isMobile }) => {
+    if (isMobile) {
+        return (
+            <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-900/20 via-[#09090b] to-[#09090b]"></div>
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-fuchsia-900/10 via-transparent to-transparent"></div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+            <motion.div
+                animate={{ x: [0, 100, -50, 0], y: [0, -50, 100, 0], scale: [1, 1.1, 0.9, 1] }}
+                transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+                className="absolute -top-[20%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-indigo-500/10 blur-[120px]"
+            />
+            <motion.div
+                animate={{ x: [0, -100, 50, 0], y: [0, 100, -50, 0], scale: [1, 0.9, 1.1, 1] }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute top-[40%] -right-[10%] w-[40vw] h-[40vw] rounded-full bg-violet-500/10 blur-[120px]"
+            />
+            <motion.div
+                animate={{ x: [0, 50, -100, 0], y: [0, -100, 50, 0], scale: [1, 1.2, 0.8, 1] }}
+                transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+                className="absolute -bottom-[20%] left-[20%] w-[60vw] h-[60vw] rounded-full bg-fuchsia-500/10 blur-[120px]"
+            />
+        </div>
+    );
+};
 
 // ARCHITECTURE: Cinematic Image Slideshow Component (Desynchronized & Optimized)
 const EventSlideshow = ({ images }) => {
@@ -96,6 +121,7 @@ const EventSlideshow = ({ images }) => {
 
 export default function GlobalPlatformHub() {
     const context = '[Global Platform Hub]';
+    const isMobile = useIsMobile();
 
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -151,50 +177,62 @@ export default function GlobalPlatformHub() {
     return (
         <main className="min-h-screen flex flex-col items-center text-zinc-200 relative selection:bg-indigo-500/30 overflow-hidden bg-[#09090b]">
             
-            <AmbientAurora />
+            <AmbientAurora isMobile={isMobile} />
             
-            <header className="w-full max-w-7xl flex items-center justify-between px-6 py-6 z-20">
-                <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
-                        NX
+            {/* [Architecture] Mobile UI: Split header into two rows on mobile to preserve layout integrity */}
+            <header className="w-full max-w-7xl flex flex-col md:flex-row justify-between px-4 md:px-6 py-4 md:py-6 z-20 gap-4 md:gap-0">
+                <div className="flex items-center justify-between w-full md:w-auto">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-[10px] tracking-tighter">
+                            NX
+                        </div>
+                        <span className="font-semibold text-zinc-100 tracking-[0.2em] text-[10px] md:text-xs uppercase">
+                            Nexus
+                        </span>
                     </div>
-                    <span className="font-semibold text-zinc-100 tracking-[0.2em] text-xs uppercase hidden sm:block">
-                        Nexus
-                    </span>
+                    {/* Mobile Vault Button */}
+                    <Link 
+                        href="/admin/login" 
+                        className="md:hidden flex items-center gap-1.5 text-[9px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] active:bg-white/[0.06] border border-white/[0.05] px-4 py-2.5 rounded-full backdrop-blur-md"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 00-2-2H6a2 2 0 00-2-2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
+                        Vault
+                    </Link>
                 </div>
 
-                <div className="flex-1 max-w-md mx-6 relative group">
+                <div className="w-full md:flex-1 md:max-w-md md:mx-6 relative group">
                     <svg className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-indigo-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
+                    {/* [Architecture] Mobile UI: Prevent iOS zoom with text-[16px] */}
                     <input 
                         type="text" 
                         placeholder="Search active tenants..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] focus:border-indigo-500/30 focus:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-sm rounded-full py-3 pl-12 pr-6 outline-none transition-all duration-300 backdrop-blur-md"
+                        className="w-full bg-white/[0.02] border border-white/[0.05] hover:border-white/[0.1] focus:border-indigo-500/30 focus:bg-white/[0.04] text-zinc-200 placeholder-zinc-600 text-[16px] md:text-sm rounded-full py-3 pl-12 pr-6 outline-none transition-all duration-300 backdrop-blur-md"
                     />
                 </div>
 
+                {/* Desktop Vault Button */}
                 <Link 
                     href="/admin/login" 
-                    className="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] px-5 py-3 rounded-full backdrop-blur-md"
+                    className="hidden md:flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-400 hover:text-white transition-colors bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] px-5 py-3 rounded-full backdrop-blur-md"
                 >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                    <span className="hidden sm:block">Vault Access</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 00-2-2H6a2 2 0 00-2-2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z" /></svg>
+                    <span>Vault Access</span>
                 </Link>
             </header>
 
-            <div className="max-w-7xl w-full z-10 flex flex-col items-center pb-12 pt-16 sm:pt-24 px-6 flex-grow">
+            <div className="max-w-7xl w-full z-10 flex flex-col items-center pb-12 pt-10 md:pt-24 md:px-6 flex-grow">
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, ease: "easeOut" }}
-                    className="text-center mb-24 space-y-6"
+                    className="text-center mb-12 md:mb-24 space-y-4 md:space-y-6 px-4 md:px-0"
                 >
-                    <h1 className="text-5xl sm:text-6xl md:text-7xl font-light tracking-tight leading-tight min-h-[1.2em]">
+                    {/* [Architecture] Mobile UI: Clamp hero text down from 7xl to 4xl on phones */}
+                    <h1 className="text-4xl sm:text-5xl md:text-7xl font-light tracking-tight leading-tight min-h-[1.2em]">
                         <EncryptedText
                             text="Global Event Ledger"
                             encryptedClassName="text-zinc-600 font-mono tracking-normal"
@@ -202,7 +240,7 @@ export default function GlobalPlatformHub() {
                             revealDelayMs={50} 
                         />
                     </h1>
-                    <p className="text-sm sm:text-base text-zinc-500 max-w-xl mx-auto font-normal leading-relaxed tracking-wide">
+                    <p className="text-xs md:text-base text-zinc-500 max-w-sm md:max-w-xl mx-auto font-normal leading-relaxed tracking-wide">
                         Secure, multi-tenant state management for enterprise conferences, global exhibitions, and exclusive summits.
                     </p>
                 </motion.div>
@@ -217,7 +255,7 @@ export default function GlobalPlatformHub() {
                                 </svg>
                             </div>
                         ) : error ? (
-                            <div className="px-6 py-4 bg-rose-500/5 border border-rose-500/10 rounded-[32px] text-rose-400/80 text-xs font-medium tracking-wide text-center">
+                            <div className="px-6 py-4 bg-rose-500/5 border border-rose-500/10 rounded-[32px] text-rose-400/80 text-xs font-medium tracking-wide text-center mx-4">
                                 {error}
                             </div>
                         ) : (
@@ -225,24 +263,36 @@ export default function GlobalPlatformHub() {
                                 variants={staggerContainer}
                                 initial="hidden"
                                 animate="show"
-                                className="w-full flex flex-col gap-16"
+                                className="w-full flex flex-col gap-12 md:gap-16"
                             >
-                                {/* 1. Command Center: Holographic Bento Grid */}
+                                {/* 1. Command Center: Holographic Bento Grid (Desktop) / Snap Carousel (Mobile) */}
                                 {featuredNodes.length > 0 && (
-                                    <motion.div layout className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full auto-rows-[minmax(180px,auto)]">
+                                    <motion.div 
+                                        layout 
+                                        // [Architecture] Mobile UI: Horizontal App Store-style Snap Scroll fallback
+                                        className="flex overflow-x-auto snap-x snap-mandatory md:grid md:grid-cols-3 gap-4 md:gap-6 w-full md:auto-rows-[minmax(180px,auto)] pb-8 md:pb-0 px-4 md:px-0 -mx-4 md:mx-0"
+                                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hide scrollbar for clean aesthetic
+                                    >
+                                        <style jsx>{`
+                                            div::-webkit-scrollbar { display: none; }
+                                        `}</style>
                                         <AnimatePresence mode="popLayout">
                                             {featuredNodes.map((event, index) => {
                                                 const isAlpha = index === 0;
                                                 const config = nodeConfigs[index] || nodeConfigs[0];
                                                 
-                                                let spanClass = 'col-span-1 md:col-span-1 md:row-span-1 min-h-[180px]';
-                                                if (index === 0) spanClass = 'md:col-span-2 md:row-span-2 min-h-[320px]';
-                                                if (index === 4) spanClass = 'md:col-span-2 md:row-span-1 min-h-[180px]';
+                                                // Desktop Spans
+                                                let spanClass = 'md:col-span-1 md:row-span-1 md:min-h-[180px]';
+                                                if (index === 0) spanClass = 'md:col-span-2 md:row-span-2 md:min-h-[320px]';
+                                                if (index === 4) spanClass = 'md:col-span-2 md:row-span-1 md:min-h-[180px]';
+
+                                                // Mobile Snap Card Sizing
+                                                const mobileClass = "min-w-[85vw] min-h-[250px] snap-center flex-shrink-0 md:min-w-0 md:snap-align-none md:flex-shrink";
 
                                                 const hasImages = event.images && event.images.length > 0;
                                                 
                                                 const cardBgClass = hasImages ? 'bg-[#0a0a0c]' : 'bg-white/[0.02] backdrop-blur-xl';
-                                                const titleClass = hasImages ? 'text-white drop-shadow-md' : 'text-zinc-100 group-hover:text-white transition-colors';
+                                                const titleClass = hasImages ? 'text-white drop-shadow-md' : 'text-zinc-100 md:group-hover:text-white transition-colors';
                                                 const descClass = hasImages ? 'text-zinc-400 drop-shadow-md' : 'text-zinc-500';
                                                 
                                                 const pillBgClass = hasImages ? 'bg-white/[0.04] shadow-sm' : 'bg-white/[0.02]';
@@ -251,7 +301,7 @@ export default function GlobalPlatformHub() {
                                                 
                                                 const buttonClass = hasImages 
                                                     ? 'bg-white hover:bg-zinc-200 text-black shadow-[0_0_15px_rgba(255,255,255,0.1)] active:scale-95' 
-                                                    : 'bg-white/[0.03] hover:bg-white/[0.1] text-zinc-300 hover:text-white';
+                                                    : 'bg-white/[0.03] md:hover:bg-white/[0.1] text-zinc-300 hover:text-white active:scale-95';
 
                                                 return (
                                                     <motion.div 
@@ -261,11 +311,11 @@ export default function GlobalPlatformHub() {
                                                         animate={{ opacity: 1, scale: 1 }}
                                                         exit={{ opacity: 0, scale: 0.95 }}
                                                         transition={{ duration: 0.3 }}
-                                                        className={`group relative overflow-hidden border border-white/[0.05] rounded-[32px] p-6 sm:p-8 flex flex-col transition-all duration-300 ease-out hover:-translate-y-1 ${cardBgClass} ${config.shadow} ${spanClass}`}
+                                                        className={`group relative overflow-hidden border border-white/[0.05] rounded-[32px] p-6 md:p-8 flex flex-col transition-all duration-300 ease-out md:hover:-translate-y-1 ${cardBgClass} ${config.shadow} ${spanClass} ${mobileClass}`}
                                                     >
                                                         {hasImages && <EventSlideshow images={event.images} />}
 
-                                                        {!hasImages && (
+                                                        {!hasImages && !isMobile && (
                                                             <>
                                                                 <div className={`absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent ${config.holo} to-transparent -skew-x-[30deg] opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-300 ease-out z-0 pointer-events-none`} />
                                                                 <div 
@@ -275,41 +325,42 @@ export default function GlobalPlatformHub() {
                                                             </>
                                                         )}
                                                         
-                                                        <div className="flex flex-wrap items-center gap-3 mb-6 relative z-10">
-                                                            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.05] backdrop-blur-md ${pillBgClass}`}>
-                                                                <svg className={`w-3.5 h-3.5 ${pillIconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                                                <span className={`${pillTextClass} text-[9px] font-bold uppercase tracking-[0.2em]`}>
+                                                        <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-6 relative z-10">
+                                                            <div className={`flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-full border border-white/[0.05] backdrop-blur-md ${pillBgClass}`}>
+                                                                <svg className={`w-3 h-3 md:w-3.5 md:h-3.5 ${pillIconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z" /></svg>
+                                                                <span className={`${pillTextClass} text-[8px] md:text-[9px] font-bold uppercase tracking-[0.2em]`}>
                                                                     {formatLedgerDate(event.start_date)}
                                                                 </span>
                                                             </div>
                                                             
                                                             {event.location && (
-                                                                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/[0.05] backdrop-blur-md ${pillBgClass}`}>
-                                                                    <svg className={`w-3.5 h-3.5 ${pillIconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                                    <span className={`${pillTextClass} text-[9px] font-bold uppercase tracking-[0.2em] truncate max-w-[150px]`}>
+                                                                <div className={`flex items-center gap-1.5 md:gap-2 px-3 py-1.5 rounded-full border border-white/[0.05] backdrop-blur-md ${pillBgClass}`}>
+                                                                    <svg className={`w-3 h-3 md:w-3.5 md:h-3.5 ${pillIconClass}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                                    <span className={`${pillTextClass} text-[8px] md:text-[9px] font-bold uppercase tracking-[0.2em] truncate max-w-[120px] md:max-w-[150px]`}>
                                                                         {event.location}
                                                                     </span>
                                                                 </div>
                                                             )}
                                                         </div>
                                                         
-                                                        <div className="mt-auto relative z-10 flex flex-col gap-3">
-                                                            <h3 className={`${isAlpha ? 'text-4xl font-light tracking-tight' : 'text-xl md:text-2xl font-light'} leading-tight ${titleClass}`}>
+                                                        <div className="mt-auto relative z-10 flex flex-col gap-2 md:gap-3">
+                                                            {/* Architecture: Enforce larger text on mobile regardless of alpha status to fit the large snap-card */}
+                                                            <h3 className={`${isAlpha ? 'text-2xl md:text-4xl font-light tracking-tight' : 'text-xl md:text-2xl font-light'} leading-tight ${titleClass}`}>
                                                                 {event.title}
                                                             </h3>
                                                             
-                                                            {isAlpha && (
-                                                                <p className={`text-sm leading-relaxed line-clamp-2 mb-2 ${descClass}`}>
+                                                            {(isAlpha || isMobile) && (
+                                                                <p className={`text-xs md:text-sm leading-relaxed line-clamp-2 mb-1 md:mb-2 ${descClass}`}>
                                                                     {event.desc || 'No configuration data provided for this tenant.'}
                                                                 </p>
                                                             )}
                                                             
                                                             <Link 
                                                                 href={`/${event.slug}`} 
-                                                                className={`w-fit py-3 px-6 rounded-full text-[10px] font-bold tracking-[0.2em] transition-all duration-300 ease-out uppercase flex items-center gap-3 mt-2 ${buttonClass}`}
+                                                                className={`w-fit py-2.5 md:py-3 px-5 md:px-6 rounded-full text-[9px] md:text-[10px] font-bold tracking-[0.2em] transition-all duration-300 ease-out uppercase flex items-center gap-2 md:gap-3 mt-1 md:mt-2 ${buttonClass}`}
                                                             >
                                                                 <span>Access Node</span>
-                                                                <svg className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                                                <svg className="w-3.5 h-3.5 md:group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                                             </Link>
                                                         </div>
                                                     </motion.div>
@@ -321,13 +372,13 @@ export default function GlobalPlatformHub() {
 
                                 {/* 2. Master Ledger CTA Button */}
                                 {ledgerNodes.length > 0 && (
-                                    <motion.div layout className="w-full flex justify-center mt-8 relative z-20">
+                                    <motion.div layout className="w-full flex justify-center mt-2 md:mt-8 relative z-20 px-4 md:px-0">
                                         <Link 
                                             href="/ledger" 
-                                            className="group relative flex items-center gap-3 px-8 py-4 bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.1] hover:border-indigo-500/50 rounded-full text-xs font-bold tracking-[0.2em] uppercase text-zinc-300 hover:text-white transition-all duration-300 backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(99,102,241,0.2)]"
+                                            className="group relative w-full md:w-auto flex justify-center items-center gap-3 px-8 py-4 bg-white/[0.03] md:hover:bg-white/[0.08] border border-white/[0.1] md:hover:border-indigo-500/50 rounded-full text-[10px] md:text-xs font-bold tracking-[0.2em] uppercase text-zinc-300 hover:text-white transition-all duration-300 backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)] md:hover:shadow-[0_0_30px_rgba(99,102,241,0.2)] active:scale-95"
                                         >
                                             <span>Access Extended Ledger</span>
-                                            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                            <svg className="w-4 h-4 md:group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                         </Link>
                                     </motion.div>
                                 )}

@@ -95,10 +95,11 @@ export default function GuestPortalLogin() {
                 className="max-w-md w-full z-10 flex flex-col items-center relative"
             >
                 
-                <div className="mb-8 w-full flex justify-center">
+                {/* [Architecture] Mobile UI: Adjusted margin-bottom to pull the card up slightly on small screens */}
+                <div className="mb-6 sm:mb-8 w-full flex justify-center">
                     <Link 
                         href={`/${eventSlug}`} 
-                        className="inline-flex items-center text-[11px] font-medium tracking-[0.1em] uppercase text-[var(--tenant-text)] opacity-70 hover:opacity-100 transition-opacity bg-black/20 px-4 py-2 border border-white/10 backdrop-blur-md shadow-lg"
+                        className="inline-flex items-center text-[10px] sm:text-[11px] font-medium tracking-[0.1em] uppercase text-[var(--tenant-text)] opacity-70 hover:opacity-100 transition-opacity bg-black/20 px-4 py-2 border border-white/10 backdrop-blur-md shadow-lg"
                         style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                     >
                         <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
@@ -107,54 +108,56 @@ export default function GuestPortalLogin() {
                 </div>
 
                 <div 
-                    className="group relative overflow-hidden w-full bg-black/40 backdrop-blur-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] border border-white/[0.08] p-8 sm:p-10 transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.05)]"
+                    className="group relative overflow-hidden w-full bg-black/40 backdrop-blur-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.7)] border border-white/[0.08] p-6 sm:p-10 transition-all duration-500 hover:shadow-[0_0_40px_rgba(255,255,255,0.05)]"
                     style={{ borderRadius: 'var(--tenant-radius)' }}
                 >
                     
                     <div className="absolute inset-y-0 -left-[150%] w-[150%] bg-gradient-to-r from-transparent to-transparent opacity-0 group-hover:opacity-100 group-hover:translate-x-[200%] transition-all duration-700 ease-out z-0 pointer-events-none transform-gpu" style={{ backgroundImage: 'linear-gradient(to right, transparent, color-mix(in srgb, var(--tenant-accent) 15%, transparent), transparent)' }} />
 
                     <div className="relative z-10">
-                        <div className="text-center mb-10">
+                        <div className="text-center mb-8 sm:mb-10">
                             <div 
-                                className="w-14 h-14 bg-white/[0.03] flex items-center justify-center mx-auto mb-5 border border-white/[0.08] shadow-inner"
+                                className="w-12 h-12 sm:w-14 sm:h-14 bg-white/[0.03] flex items-center justify-center mx-auto mb-4 sm:mb-5 border border-white/[0.08] shadow-inner"
                                 style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                             >
-                                <svg className="w-6 h-6 text-[var(--tenant-text)] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-[var(--tenant-text)] opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             </div>
-                            <h1 className="text-3xl font-bold text-[var(--tenant-text)] mb-2 tracking-tight drop-shadow-md">Guest Portal</h1>
-                            <p className="text-[10px] text-[var(--tenant-text)] opacity-50 font-semibold uppercase tracking-[0.2em]">{eventSlug.replace(/-/g, ' ')}</p>
+                            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--tenant-text)] mb-2 tracking-tight drop-shadow-md">Guest Portal</h1>
+                            <p className="text-[9px] sm:text-[10px] text-[var(--tenant-text)] opacity-50 font-semibold uppercase tracking-[0.2em]">{eventSlug.replace(/-/g, ' ')}</p>
                         </div>
 
-                        <form onSubmit={handleLogin} className="space-y-6">
+                        {/* [Architecture] Mobile UI: Tighter vertical spacing between inputs */}
+                        <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
                             
                             {status === 'error' && (
                                 <div 
-                                    className="flex items-start p-4 bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 shadow-sm tracking-wide"
+                                    className="flex items-start p-3 sm:p-4 bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400 shadow-sm tracking-wide"
                                     style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                                 >
-                                    <svg className="w-4 h-4 text-rose-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    {message}
+                                    <svg className="w-4 h-4 text-rose-500 mr-2 sm:mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span className="leading-snug">{message}</span>
                                 </div>
                             )}
 
                             {status === 'success' && (
                                 <div 
-                                    className="flex items-start p-4 bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 shadow-sm transition-all tracking-wide"
+                                    className="flex items-start p-3 sm:p-4 bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 shadow-sm transition-all tracking-wide"
                                     style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                                 >
-                                    <svg className="w-4 h-4 text-emerald-500 mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    {message}
+                                    <svg className="w-4 h-4 text-emerald-500 mr-2 sm:mr-3 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                    <span className="leading-snug">{message}</span>
                                 </div>
                             )}
 
                             <div>
-                                <label className="block text-[10px] font-bold text-[var(--tenant-text)] opacity-60 mb-2 uppercase tracking-[0.15em]">Registered Email</label>
+                                <label className="block text-[10px] font-bold text-[var(--tenant-text)] opacity-60 mb-2 uppercase tracking-[0.15em] ml-1">Registered Email</label>
+                                {/* [Architecture] Mobile UI: Set text-[16px] to prevent iOS zoom */}
                                 <input 
                                     type="email" 
                                     name="email"
                                     value={formData.email} 
                                     onChange={handleChange} 
-                                    className="w-full px-5 py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] text-sm" 
+                                    className="w-full px-4 sm:px-5 py-3 sm:py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] text-[16px] sm:text-sm" 
                                     style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                                     placeholder="guest@enterprise.com" 
                                     disabled={status === 'loading'}
@@ -162,13 +165,14 @@ export default function GuestPortalLogin() {
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-bold text-[var(--tenant-text)] opacity-60 mb-2 uppercase tracking-[0.15em]">6-Character Access Code</label>
+                                <label className="block text-[10px] font-bold text-[var(--tenant-text)] opacity-60 mb-2 uppercase tracking-[0.15em] ml-1">6-Character Access Code</label>
+                                {/* [Architecture] Mobile UI: Set text-[16px] to prevent iOS zoom */}
                                 <input 
                                     type="password" 
                                     name="accessCode"
                                     value={formData.accessCode} 
                                     onChange={handleChange} 
-                                    className="w-full px-5 py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] uppercase tracking-[0.3em] font-mono text-sm" 
+                                    className="w-full px-4 sm:px-5 py-3 sm:py-3.5 bg-black/40 backdrop-blur-sm border border-white/[0.1] focus:ring-1 focus:border-white/30 outline-none transition-all duration-300 shadow-inner hover:bg-black/60 text-[var(--tenant-text)] uppercase tracking-[0.3em] font-mono text-[16px] sm:text-sm" 
                                     style={{ borderRadius: 'var(--tenant-btn-radius)' }}
                                     placeholder="••••••" 
                                     maxLength={6}
@@ -179,7 +183,7 @@ export default function GuestPortalLogin() {
                             <button 
                                 type="submit" 
                                 disabled={status === 'loading'}
-                                className="w-full py-3.5 px-4 shadow-[0_0_20px_rgba(255,255,255,0.1)] transform transition-all duration-300 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center group text-sm tracking-wide mt-2 font-bold uppercase"
+                                className="w-full py-3.5 px-4 shadow-[0_0_20px_rgba(255,255,255,0.1)] transform transition-all duration-300 active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex justify-center items-center group text-xs sm:text-sm tracking-wide mt-2 font-bold uppercase"
                                 style={{ backgroundColor: 'var(--tenant-text)', color: 'var(--tenant-bg)', borderRadius: 'var(--tenant-btn-radius)' }}
                             >
                                 {status === 'loading' ? (
@@ -199,14 +203,15 @@ export default function GuestPortalLogin() {
                             </button>
                         </form>
 
-                        <div className="mt-8 pt-6 border-t border-white/[0.05] text-center">
-                            <p className="text-[11px] text-[var(--tenant-text)] opacity-60 font-medium flex flex-col sm:flex-row items-center justify-center gap-1.5 tracking-wide">
+                        <div className="mt-8 pt-5 sm:pt-6 border-t border-white/[0.05] text-center">
+                            {/* [Architecture] Mobile UI: Flex col on mobile for better touch targets, row on desktop */}
+                            <p className="text-[10px] sm:text-[11px] text-[var(--tenant-text)] opacity-60 font-medium flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-1.5 tracking-wide">
                                 <span>Didn't receive your access code?</span>
                                 <button
                                     type="button"
                                     onClick={handleResendCode}
                                     disabled={status === 'loading'}
-                                    className="font-bold opacity-100 hover:opacity-70 transition-opacity disabled:cursor-not-allowed underline decoration-white/20 underline-offset-4"
+                                    className="font-bold opacity-100 hover:opacity-70 transition-opacity disabled:cursor-not-allowed underline decoration-white/20 underline-offset-4 py-2 sm:py-0 px-4 sm:px-0"
                                 >
                                     Resend it
                                 </button>
